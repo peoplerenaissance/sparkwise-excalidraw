@@ -164,6 +164,7 @@ const initializeScene = async (opts: {
   } = await loadScene(null, null, localDataState);
 
   let roomLinkData = getCollaborationLinkData(window.location.href);
+
   const isExternalScene = !!(id || jsonBackendMatch || roomLinkData);
   if (isExternalScene) {
     if (
@@ -732,6 +733,7 @@ const ExcalidrawWrapper = () => {
               },
             },
           },
+          mode: new URLSearchParams(window.location.search).get("mode") || "",
         }}
         langCode={langCode}
         renderCustomStats={renderCustomStats}
