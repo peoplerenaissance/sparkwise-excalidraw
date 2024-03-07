@@ -35,6 +35,7 @@ import {
   BinaryFiles,
   ExcalidrawInitialDataState,
   UIAppState,
+  UIOptions,
 } from "../packages/excalidraw/types";
 import {
   debounce,
@@ -692,6 +693,9 @@ const ExcalidrawWrapper = () => {
     );
   }
 
+  const uiMode = new URLSearchParams(window.location.search).get(
+    "mode",
+  ) as UIOptions["mode"];
   return (
     <div
       style={{ height: "100%" }}
@@ -733,7 +737,7 @@ const ExcalidrawWrapper = () => {
               },
             },
           },
-          mode: new URLSearchParams(window.location.search).get("mode") || "",
+          mode: uiMode || "all",
         }}
         langCode={langCode}
         renderCustomStats={renderCustomStats}
