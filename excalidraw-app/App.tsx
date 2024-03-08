@@ -283,7 +283,7 @@ export const appLangCodeAtom = atom(
 const ExcalidrawWrapper = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [langCode, setLangCode] = useAtom(appLangCodeAtom);
-  const isCollabDisabled = isRunningInIframe();
+  const isCollabDisabled = false;
 
   // initial state
   // ---------------------------------------------------------------------------

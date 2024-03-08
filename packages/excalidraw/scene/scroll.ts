@@ -86,7 +86,7 @@ export const calculateScrollCenter = (
     zoom.value > 0.2
   ) {
     zoom = {
-      value: getNormalizedZoom(zoom.value - ZOOM_STEP),
+      value: getNormalizedZoom(zoom.value - 0.02),
     };
   }
 
