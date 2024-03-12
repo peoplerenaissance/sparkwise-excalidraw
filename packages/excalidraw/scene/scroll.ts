@@ -3,7 +3,6 @@ import { ExcalidrawElement } from "../element/types";
 import { getCommonBounds, getVisibleElements } from "../element";
 
 import { getNormalizedZoom } from "./zoom";
-import { ZOOM_STEP } from "../constants";
 
 const sceneCoordsToViewportCoords = (
   { sceneX, sceneY }: { sceneX: number; sceneY: number },

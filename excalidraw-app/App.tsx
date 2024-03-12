@@ -46,6 +46,7 @@ import {
   ResolvablePromise,
   resolvablePromise,
   isRunningInIframe,
+  getUiMode,
 } from "../packages/excalidraw/utils";
 import {
   FIREBASE_STORAGE_PREFIXES,
@@ -693,9 +694,7 @@ const ExcalidrawWrapper = () => {
     );
   }
 
-  const uiMode = new URLSearchParams(window.location.search).get(
-    "mode",
-  ) as UIOptions["mode"];
+  const uiMode = getUiMode();
   return (
     <div
       style={{ height: "100%" }}

@@ -11,6 +11,7 @@ import {
   ActiveTool,
   AppState,
   ToolType,
+  UIOptions,
   UnsubscribeCallback,
   Zoom,
 } from "./types";
@@ -1052,6 +1053,15 @@ export function getSvgPathFromStroke(points: number[][], closed = true) {
 
 export const normalizeEOL = (str: string) => {
   return str.replace(/\r?\n|\r/g, "\n");
+};
+
+let _uiMode: string | undefined = "";
+export const getUiMode = (): UIOptions["mode"] => {
+  if (!_uiMode) {
+    _uiMode = (new URLSearchParams(window.location.search).get("mode") ??
+      "all") as UIOptions["mode"];
+  }
+  return _uiMode as UIOptions["mode"];
 };
 
 // -----------------------------------------------------------------------------
