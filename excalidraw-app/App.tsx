@@ -787,7 +787,6 @@ const ExcalidrawWrapper = () => {
             </OverwriteConfirmDialog.Action>
           )}
         </OverwriteConfirmDialog>
-        <AppFooter />
         <TTDDialog
           onTextSubmit={async (input) => {
             try {
