@@ -89,9 +89,11 @@ const ENABLED_KEYS = new Set([
   "DELETE",
   "BACKSPACE",
   "Z",
-  "SHIFT",
   "CTRL_OR_CMD",
+  "SPACE",
 ]);
+
+const ENABLED_CODES = new Set(["Z"]);
 
 const keysProxy = {
   get(target: typeof INTERNAL_KEYS, key: string) {
@@ -103,7 +105,7 @@ const keysProxy = {
 
 const codesProxy = {
   get(target: typeof INTERNAL_CODES, key: string) {
-    return getUiMode() === "all" || ENABLED_KEYS.has(key as any)
+    return getUiMode() === "all" || ENABLED_CODES.has(key as any)
       ? target[key as keyof typeof INTERNAL_CODES]
       : "";
   },

@@ -1,5 +1,6 @@
 import { COLOR_PALETTE } from "./colors";
 import {
+  DEFAULT_UI_OPTIONS,
   DEFAULT_VERSION,
   EVENT,
   FONT_FAMILY,
@@ -1059,7 +1060,7 @@ let _uiMode: string | undefined = "";
 export const getUiMode = (): UIOptions["mode"] => {
   if (!_uiMode) {
     _uiMode = (new URLSearchParams(window.location.search).get("mode") ??
-      "all") as UIOptions["mode"];
+      DEFAULT_UI_OPTIONS.mode) as UIOptions["mode"];
   }
   return _uiMode as UIOptions["mode"];
 };
