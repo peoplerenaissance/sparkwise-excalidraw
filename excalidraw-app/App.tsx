@@ -35,7 +35,6 @@ import {
   BinaryFiles,
   ExcalidrawInitialDataState,
   UIAppState,
-  UIOptions,
 } from "../packages/excalidraw/types";
 import {
   debounce,
@@ -45,7 +44,6 @@ import {
   preventUnload,
   ResolvablePromise,
   resolvablePromise,
-  isRunningInIframe,
   getUiMode,
 } from "../packages/excalidraw/utils";
 import {
@@ -94,7 +92,6 @@ import {
 } from "../packages/excalidraw/data/library";
 import { AppMainMenu } from "./components/AppMainMenu";
 import { AppWelcomeScreen } from "./components/AppWelcomeScreen";
-import { AppFooter } from "./components/AppFooter";
 import { atom, Provider, useAtom, useAtomValue } from "jotai";
 import { useAtomWithInitialValue } from "../packages/excalidraw/jotai";
 import { appJotaiStore } from "./app-jotai";
