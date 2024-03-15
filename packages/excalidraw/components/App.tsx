@@ -270,6 +270,7 @@ import {
   updateStable,
   addEventListener,
   normalizeEOL,
+  getUiMode,
 } from "../utils";
 import {
   createSrcDoc,
@@ -2318,10 +2319,10 @@ class App extends React.Component<AppProps, AppState> {
   };
 
   private isMobileBreakpoint = (width: number, height: number) => {
-    return (
-      width < MQ_MAX_WIDTH_PORTRAIT ||
-      (height < MQ_MAX_HEIGHT_LANDSCAPE && width < MQ_MAX_WIDTH_LANDSCAPE)
-    );
+    return getUiMode() === "all"
+      ? width < MQ_MAX_WIDTH_PORTRAIT ||
+          (height < MQ_MAX_HEIGHT_LANDSCAPE && width < MQ_MAX_WIDTH_LANDSCAPE)
+      : false;
   };
 
   private refreshViewportBreakpoints = () => {
