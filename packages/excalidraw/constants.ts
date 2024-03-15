@@ -108,9 +108,9 @@ export const CLASSES = {
 // 1-based in case we ever do `if(element.fontFamily)`
 export const FONT_FAMILY = {
   ComicNeue: 1,
-  Helvetica: 2,
+  Inter: 2,
   Cascadia: 3,
-  Assistant: 4,
+  ProximaNova: 4,
 };
 
 export const THEME = {

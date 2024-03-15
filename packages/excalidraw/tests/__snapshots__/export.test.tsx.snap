@@ -15,8 +15,16 @@ exports[`export > exporting svg containing transformed images > svg export outpu
         src: url("https://excalidraw.com/Cascadia.woff2");
       }
       @font-face {
-        font-family: "Assistant";
-        src: url("https://excalidraw.com/Assistant-Regular.woff2");
+        font-family: "ProximaNova";
+        src: url("https://excalidraw.com/ProximaNova-Regular.woff2");
+        font-weight: 400;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "ProximaNova";
+        src: url("https://excalidraw.com/ProximaNova-SemiBold.woff2");
+        font-weight: 600;
+        font-display: swap;
       }
     </style>
     

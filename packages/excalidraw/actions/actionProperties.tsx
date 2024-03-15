@@ -759,7 +759,7 @@ export const actionChangeFontFamily = register({
         testId: "font-family-handdrawn",
       },
       {
-        value: FONT_FAMILY.Helvetica,
+        value: FONT_FAMILY.Inter,
         text: t("labels.normal"),
         icon: FontFamilyNormalIcon,
         testId: "font-family-normal",

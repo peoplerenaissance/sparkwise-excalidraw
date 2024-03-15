@@ -1265,7 +1265,7 @@ describe("textWysiwyg", () => {
       fireEvent.click(screen.getByTitle(/normal/i));
       expect(
         (h.elements[1] as ExcalidrawTextElementWithContainer).fontFamily,
-      ).toEqual(FONT_FAMILY.Helvetica);
+      ).toEqual(FONT_FAMILY.Inter);
       expect(
         (h.elements[1] as ExcalidrawTextElementWithContainer).lineHeight,
       ).toEqual(1.15);

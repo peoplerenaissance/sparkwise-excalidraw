@@ -125,7 +125,7 @@ const addFrameLabelsAsTextElements = (
       let textElement: Mutable<ExcalidrawTextElement> = newTextElement({
         x: element.x,
         y: element.y - FRAME_STYLE.nameOffsetY,
-        fontFamily: FONT_FAMILY.Assistant,
+        fontFamily: FONT_FAMILY.ProximaNova,
         fontSize: FRAME_STYLE.nameFontSize,
         lineHeight:
           FRAME_STYLE.nameLineHeight as ExcalidrawTextElement["lineHeight"],
@@ -422,8 +422,16 @@ export const exportToSvg = async (
         src: url("${assetPath}Cascadia.woff2");
       }
       @font-face {
-        font-family: "Assistant";
-        src: url("${assetPath}Assistant-Regular.woff2");
+        font-family: "ProximaNova";
+        src: url("${assetPath}ProximaNova-Regular.woff2");
+        font-weight: 400;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "ProximaNova";
+        src: url("${assetPath}ProximaNova-SemiBold.woff2");
+        font-weight: 600;
+        font-display: swap;
       }
     </style>
     ${exportingFrameClipPath}
