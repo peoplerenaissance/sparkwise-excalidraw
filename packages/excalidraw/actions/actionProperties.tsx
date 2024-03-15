@@ -753,10 +753,10 @@ export const actionChangeFontFamily = register({
       testId: string;
     }[] = [
       {
-        value: FONT_FAMILY.Virgil,
+        value: FONT_FAMILY.ComicNeue,
         text: t("labels.handDrawn"),
         icon: FreedrawIcon,
-        testId: "font-family-virgil",
+        testId: "font-family-handdrawn",
       },
       {
         value: FONT_FAMILY.Helvetica,

@@ -414,8 +414,8 @@ export const exportToSvg = async (
   <defs>
     <style class="style-fonts">
       @font-face {
-        font-family: "Virgil";
-        src: url("${assetPath}Virgil.woff2");
+        font-family: "ComicNeue";
+        src: url("${assetPath}ComicNeue-Regular.woff2");
       }
       @font-face {
         font-family: "Cascadia";
