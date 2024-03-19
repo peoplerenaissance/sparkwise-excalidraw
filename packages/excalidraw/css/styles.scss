@@ -206,6 +206,9 @@
     outline: transparent;
     box-shadow: 0 0 0 1px var(--color-brand-hover);
   }
+  .buttonList label:focus-within {
+    box-shadow: 0 0 0 1px var(--sparkwise-color-gray-100);
+  }
 
   .buttonList {
     .ToolIcon__icon {
