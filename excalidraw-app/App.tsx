@@ -68,7 +68,6 @@ import {
 import {
   getLibraryItemsFromStorage,
   importFromLocalStorage,
-  importUsernameFromLocalStorage,
 } from "./data/localStorage";
 import CustomStats from "./CustomStats";
 import {
@@ -440,7 +439,7 @@ const ExcalidrawWrapper = () => {
         // don't sync if local state is newer or identical to browser state
         if (isBrowserStorageStateNewer(STORAGE_KEYS.VERSION_DATA_STATE)) {
           const localDataState = importFromLocalStorage();
-          const username = importUsernameFromLocalStorage();
+          const username = getUsernameFromSearchParams();
           let langCode = languageDetector.detect() || defaultLang.code;
           if (Array.isArray(langCode)) {
             langCode = langCode[0];

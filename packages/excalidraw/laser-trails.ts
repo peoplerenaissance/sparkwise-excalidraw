@@ -4,7 +4,6 @@ import { AnimationFrameHandler } from "./animation-frame-handler";
 import type App from "./components/App";
 import { SocketId } from "./types";
 import { easeOut } from "./utils";
-import { getClientColor } from "./clients";
 
 export class LaserTrails implements Trail {
   public localTrail: AnimatedTrail;
@@ -85,7 +84,7 @@ export class LaserTrails implements Trail {
         trail = new AnimatedTrail(this.animationFrameHandler, this.app, {
           ...this.getTrailOptions(),
           fill: () =>
-            this.app.state.collaborators.get(key)?.color.background || "red",
+            this.app.state.collaborators.get(key)?.color?.background || "red",
         });
         trail.start(this.container);
 
