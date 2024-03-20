@@ -46,6 +46,7 @@ import {
   resolvablePromise,
   getUiMode,
   getUsernameFromSearchParams,
+  getUserColorFromSearchParams,
 } from "../packages/excalidraw/utils";
 import {
   FIREBASE_STORAGE_PREFIXES,
@@ -231,7 +232,9 @@ const initializeScene = async (opts: {
   if (roomLinkData && opts.collabAPI) {
     const { excalidrawAPI, collabAPI } = opts;
     const username = getUsernameFromSearchParams();
+    const userColor = getUserColorFromSearchParams();
     collabAPI.setUsername(username || "");
+    collabAPI.setUserColor(userColor || "");
 
     const scene = await collabAPI.startCollaboration(roomLinkData);
 

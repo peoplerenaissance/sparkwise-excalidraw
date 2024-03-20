@@ -1069,6 +1069,10 @@ export const getUsernameFromSearchParams = (): string | null => {
   return new URLSearchParams(window.location.search).get("name");
 };
 
+export const getUserColorFromSearchParams = (): string | null => {
+  return new URLSearchParams(window.location.search).get("color");
+};
+
 // -----------------------------------------------------------------------------
 type HasBrand<T> = {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

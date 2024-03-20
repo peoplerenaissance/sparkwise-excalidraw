@@ -48,6 +48,8 @@ import {
 } from "../data/httpStorage";
 import {
   importUsernameFromLocalStorage,
+  importUserColorFromLocalStorage,
+  saveUserColorToLocalStorage,
   saveUsernameToLocalStorage,
 } from "../data/localStorage";
 import Portal from "./Portal";
@@ -80,6 +82,7 @@ import { appJotaiStore } from "../app-jotai";
 import { Mutable, ValueOf } from "../../packages/excalidraw/utility-types";
 import { getVisibleSceneBounds } from "../../packages/excalidraw/element/bounds";
 import { withBatchedUpdates } from "../../packages/excalidraw/reactUtils";
+import { getClientColor } from "../../packages/excalidraw/clients";
 
 export const collabAPIAtom = atom<CollabAPI | null>(null);
 export const isCollaboratingAtom = atom(false);
@@ -88,6 +91,7 @@ export const isOfflineAtom = atom(false);
 interface CollabState {
   errorMessage: string | null;
   username: string;
+  userColor: string;
   activeRoomLink: string | null;
 }
 
@@ -105,6 +109,8 @@ export interface CollabAPI {
   fetchImageFilesFromFirebase: CollabInstance["fetchImageFilesFromFirebase"];
   setUsername: CollabInstance["setUsername"];
   getUsername: CollabInstance["getUsername"];
+  setUserColor: CollabInstance["setUserColor"];
+  getUserColor: CollabInstance["getUserColor"];
   getActiveRoomLink: CollabInstance["getActiveRoomLink"];
   setErrorMessage: CollabInstance["setErrorMessage"];
 }
@@ -129,6 +135,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     this.state = {
       errorMessage: null,
       username: importUsernameFromLocalStorage() || "",
+      userColor: importUserColorFromLocalStorage() || "",
       activeRoomLink: null,
     };
     this.portal = new Portal(this);
@@ -197,6 +204,8 @@ class Collab extends PureComponent<CollabProps, CollabState> {
       stopCollaboration: this.stopCollaboration,
       setUsername: this.setUsername,
       getUsername: this.getUsername,
+      setUserColor: this.setUserColor,
+      getUserColor: this.getUserColor,
       getActiveRoomLink: this.getActiveRoomLink,
       setErrorMessage: this.setErrorMessage,
     };
@@ -419,6 +428,12 @@ class Collab extends PureComponent<CollabProps, CollabState> {
       });
     }
 
+    if (!this.state.userColor) {
+      this.setUserColor(
+        getClientColor(this.portal.socket?.id || this.state.username),
+      );
+    }
+
     if (this.portal.socket) {
       return null;
     }
@@ -538,7 +553,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
             );
             break;
           case WS_SUBTYPES.MOUSE_LOCATION: {
-            const { pointer, button, username, selectedElementIds } =
+            const { pointer, button, username, selectedElementIds, userColor } =
               decryptedData.payload;
 
             const socketId: SocketUpdateDataSource["MOUSE_LOCATION"]["payload"]["socketId"] =
@@ -551,6 +566,10 @@ class Collab extends PureComponent<CollabProps, CollabState> {
               button,
               selectedElementIds,
               username,
+              color: {
+                background: userColor,
+                stroke: userColor,
+              },
             });
 
             break;
@@ -591,10 +610,15 @@ class Collab extends PureComponent<CollabProps, CollabState> {
           }
 
           case WS_SUBTYPES.IDLE_STATUS: {
-            const { userState, socketId, username } = decryptedData.payload;
+            const { userState, socketId, username, userColor } =
+              decryptedData.payload;
             this.updateCollaborator(socketId, {
               userState,
               username,
+              color: {
+                background: userColor,
+                stroke: userColor,
+              },
             });
             break;
           }
@@ -919,6 +943,13 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   };
 
   getUsername = () => this.state.username;
+
+  setUserColor = (userColor: string) => {
+    this.setState({ userColor });
+    saveUserColorToLocalStorage(userColor);
+  };
+
+  getUserColor = () => this.state.userColor;
 
   setActiveRoomLink = (activeRoomLink: string | null) => {
     this.setState({ activeRoomLink });
