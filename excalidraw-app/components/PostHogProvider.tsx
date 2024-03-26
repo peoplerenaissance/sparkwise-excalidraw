@@ -7,9 +7,9 @@ interface PostHogProviderWrapperProps {
 const PostHogProviderWrapper: React.FC<PostHogProviderWrapperProps> = ({
   children,
 }: PostHogProviderWrapperProps) => {
-  const apiKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY;
+  const apiKey = import.meta.env.VITE_APP_POSTHOG_KEY;
   const options = {
-    api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
+    api_host: import.meta.env.VITE_APP_POSTHOG_HOST,
     session_recording: {
       recordCrossOriginIframes: true,
     },
