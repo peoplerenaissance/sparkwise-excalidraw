@@ -17,6 +17,7 @@ const PostHogProviderWrapper: React.FC<PostHogProviderWrapperProps> = ({
   if (!apiKey || !options.api_host) {
     return <>{children}</>;
   }
+
   return (
     <PostHogProvider apiKey={apiKey} options={options}>
       {children}
