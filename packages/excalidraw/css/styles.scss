@@ -315,6 +315,7 @@
   .shapes-section {
     position: relative;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     pointer-events: none !important;

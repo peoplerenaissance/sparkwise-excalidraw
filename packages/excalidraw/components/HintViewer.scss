@@ -7,7 +7,7 @@ $wide-viewport-width: 1000px;
   .HintViewer {
     pointer-events: none;
     box-sizing: border-box;
-    position: absolute;
+    position: relative;
     display: flex;
     justify-content: center;
     left: 0;
@@ -18,6 +18,10 @@ $wide-viewport-width: 1000px;
     text-align: center;
     color: var(--color-gray-40);
     font-size: 0.75rem;
+
+    &.ui-mode-all {
+      position: absolute;
+    }
 
     @include isMobile {
       position: static;
