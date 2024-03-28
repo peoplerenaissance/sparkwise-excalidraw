@@ -1,5 +1,22 @@
 import * as Sentry from "@sentry/browser";
 import * as SentryIntegrations from "@sentry/integrations";
+import posthog from "posthog-js";
+
+const apiKey = import.meta.env.VITE_APP_POSTHOG_KEY;
+const options = {
+  api_host: import.meta.env.VITE_APP_POSTHOG_HOST,
+  session_recording: {
+    recordCrossOriginIframes: true,
+  },
+};
+
+const posthogIntegration = [];
+if (apiKey || options.api_host) {
+  posthog.init(apiKey, options);
+  posthogIntegration.push(
+    new posthog.SentryIntegration(posthog, "sparkwise", 4506979770171392),
+  );
+}
 
 const SentryEnvHostnameMap: { [key: string]: string } = {
   "draw-prod.sparkwise.co": "production",
@@ -23,5 +40,6 @@ Sentry.init({
     new SentryIntegrations.CaptureConsole({
       levels: ["error"],
     }),
+    ...posthogIntegration,
   ],
 });
