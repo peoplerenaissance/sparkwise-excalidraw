@@ -12,7 +12,7 @@
     "@excalidraw/random-username": "1.0.0",
     "@sentry/browser": "6.2.5",
     "@sentry/integrations": "6.2.5",
-    "firebase": "10.12.4",
+    "firebase": "8.3.3",
     "i18next-browser-languagedetector": "6.1.4",
     "idb-keyval": "6.0.3",
     "jotai": "1.13.1",
@@ -91,6 +91,7 @@
   },
   "resolutions": {
     "@babel/traverse": ">=7.23.2",
-    "node-fetch": "2.6.7"
+    "node-fetch": "2.6.7",
+    "@grpc/grpc-js": "1.8.22"
   }
 }
