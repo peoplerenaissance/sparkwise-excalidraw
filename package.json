@@ -12,7 +12,7 @@
     "@excalidraw/random-username": "1.0.0",
     "@sentry/browser": "6.2.5",
     "@sentry/integrations": "6.2.5",
-    "firebase": "8.3.3",
+    "firebase": "10.12.4",
     "i18next-browser-languagedetector": "6.1.4",
     "idb-keyval": "6.0.3",
     "jotai": "1.13.1",
