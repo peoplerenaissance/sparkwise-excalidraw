@@ -49,12 +49,12 @@ const elements = [
     opacity: 100,
     seed: 1683771448,
     text: "test",
-    font: "20px ComicNeue",
+    font: "20px ProximaNova",
     baseline: 22,
   },
 ];
 
-registerFont("./public/ComicNeue-Regular.woff2", { family: "ComicNeue" });
+registerFont("./public/ProximaNova-Regular.woff2", { family: "ProximaNova" });
 registerFont("./public/Cascadia.woff2", { family: "Cascadia" });
 
 const canvas = exportToCanvas(

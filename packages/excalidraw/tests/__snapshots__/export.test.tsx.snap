@@ -7,10 +7,6 @@ exports[`export > exporting svg containing transformed images > svg export outpu
   <defs>
     <style class="style-fonts">
       @font-face {
-        font-family: "ComicNeue";
-        src: url("https://draw-next.sparkwise.co/ComicNeue-Regular.woff2");
-      }
-      @font-face {
         font-family: "Cascadia";
         src: url("https://draw-next.sparkwise.co/Cascadia.woff2");
       }

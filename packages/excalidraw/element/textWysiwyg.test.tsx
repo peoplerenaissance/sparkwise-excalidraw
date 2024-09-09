@@ -805,7 +805,7 @@ describe("textWysiwyg", () => {
       await new Promise((r) => setTimeout(r, 0));
       updateTextEditor(editor, "Hello World!");
       editor.blur();
-      expect(text.fontFamily).toEqual(FONT_FAMILY.ComicNeue);
+      expect(text.fontFamily).toEqual(FONT_FAMILY.ProximaNova);
       UI.clickTool("text");
 
       mouse.clickAt(
@@ -830,7 +830,7 @@ describe("textWysiwyg", () => {
       });
       expect(
         (h.elements[1] as ExcalidrawTextElementWithContainer).fontFamily,
-      ).toEqual(FONT_FAMILY.ComicNeue);
+      ).toEqual(FONT_FAMILY.ProximaNova);
 
       //redo
       Keyboard.withModifierKeys({ ctrl: true, shift: true }, () => {
