@@ -4,8 +4,8 @@
   <defs>
     <style>
       @font-face {
-        font-family: "ComicNeue";
-        src: url("https://excalidraw.com/ComicNeue.woff2");
+        font-family: "ProximaNova";
+        src: url("https://excalidraw.com/ProximaNova.woff2");
       }
       @font-face {
         font-family: "Cascadia";

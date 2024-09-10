@@ -1,13 +1,6 @@
 /* Inter */
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap");
 
-/* Handwritten style font */
-@font-face {
-  font-family: "ComicNeue";
-  src: url("ComicNeue-Regular.woff2");
-  font-weight: 400;
-}
-
 /* Code style font */
 /* https://github.com/microsoft/cascadia-code */
 @font-face {
@@ -17,6 +10,7 @@
 }
 
 /* Normal style font */
+/* Handwritten style font */
 @font-face {
   font-family: "ProximaNova";
   src: url("ProximaNova-Regular.woff2");

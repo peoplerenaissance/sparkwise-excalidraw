@@ -79,7 +79,7 @@ describe("duplicating single elements", () => {
       opacity: 100,
       text: "hello",
       fontSize: 20,
-      fontFamily: FONT_FAMILY.ComicNeue,
+      fontFamily: FONT_FAMILY.ProximaNova,
       textAlign: "left",
       verticalAlign: "top",
     });
