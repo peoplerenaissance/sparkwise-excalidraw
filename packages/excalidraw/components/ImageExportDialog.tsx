@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { sanitizeUrl } from "@braintree/sanitize-url";
 
 import type { ActionManager } from "../actions/manager";
 import type { AppClassProperties, BinaryFiles, UIAppState } from "../types";
@@ -105,11 +106,14 @@ const ImageExportModal = ({
     if (!maxWidth) {
       return;
     }
+    // sanitize the projectName first since it comes directly from user input:
+    const sanitizedProjectName = sanitizeUrl(projectName);
+    const appStateSnapshotCopy = { ...appStateSnapshot };
+    appStateSnapshotCopy.name = sanitizedProjectName;
     exportToCanvas({
       elements: exportedElements,
       appState: {
-        ...appStateSnapshot,
-        name: projectName,
+        ...appStateSnapshotCopy,
         exportBackground: exportWithBackground,
         exportWithDarkMode: exportDarkMode,
         exportScale,
