@@ -12,9 +12,8 @@ export const updateOriginalContainerCache = (
   id: ExcalidrawTextContainer["id"],
   height: ExcalidrawTextContainer["height"],
 ) => {
-
-  if (typeof id !== 'string' || id === '__proto__') {
-    throw new Error('Invalid cache key');
+  if (typeof id !== "string" || id === "__proto__") {
+    throw new Error("Invalid cache key");
   }
 
   const data =
