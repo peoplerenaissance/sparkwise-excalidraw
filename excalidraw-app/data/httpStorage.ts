@@ -76,7 +76,7 @@ export class TokenService {
         "[draw][token-service] Rejected message from untrusted origin:",
         event.origin,
         this.allowedOrigins,
-        import.meta.env.VITE_APP_TOKEN_SERVICE_ALLOWED_ORIGINS
+        import.meta.env.VITE_APP_TOKEN_SERVICE_ALLOWED_ORIGINS,
       );
       return;
     }
