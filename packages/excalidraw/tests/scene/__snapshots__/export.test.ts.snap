@@ -22,10 +22,6 @@ exports[`exportToSvg > with default arguments 1`] = `
     >
       
       @font-face {
-        font-family: "ComicNeue";
-        src: url("https://draw-next.sparkwise.co/ComicNeue-Regular.woff2");
-      }
-      @font-face {
         font-family: "Cascadia";
         src: url("https://draw-next.sparkwise.co/Cascadia.woff2");
       }
@@ -95,10 +91,6 @@ exports[`exportToSvg > with elements that have a link 1`] = `
   <defs>
     <style class="style-fonts">
       @font-face {
-        font-family: "ComicNeue";
-        src: url("https://draw-next.sparkwise.co/ComicNeue-Regular.woff2");
-      }
-      @font-face {
         font-family: "Cascadia";
         src: url("https://draw-next.sparkwise.co/Cascadia.woff2");
       }
@@ -126,10 +118,6 @@ exports[`exportToSvg > with exportEmbedScene 1`] = `
   <!-- payload-type:application/vnd.excalidraw+json --><!-- payload-version:2 --><!-- payload-start -->eyJ2ZXJzaW9uIjoiMSIsImVuY29kaW5nIjoiYnN0cmluZyIsImNvbXByZXNzZWQiOnRydWUsImVuY29kZWQiOiJ4nO1SPW/CMFx1MDAxMN35XHUwMDE1UbpcIuFAIJSNlqpCqtqBXHUwMDAxqVVcdTAwMDdcdTAwMTNfiFx1MDAxNcdcdTAwMGW2w4dcdTAwMTD/vbaBuETMnerBkt+9d3e+e8dOXHUwMDEwhPpQQThcdELYp5hRXCLxLuxafFx1MDAwYlJRwU2o795K1DJ1zFxc62rS6zFhXHUwMDA0uVB6MkBcYp1FwKBcdTAwMDSulaF9mXdcdTAwMTBcdTAwMWPdbVwilFjpdik3XHUwMDFm06ygnPQ3aZm8zaavn07qSHvDiaO4eVx1MDAxZmz1QdK8d5To3GBcdTAwMTFCXHKWXHUwMDAzXee6XHUwMDA1Yr5mtlePKC1FXHUwMDAxz4JcdGlcdTAwMWJ5QO740iucXHUwMDE2aylqTjwnXHUwMDFhYrzKPCejjC30gZ2ngNO8llx1MDAxMLYqLK8ttvBGp4SZsleZkuucg1I3XHUwMDFhUeGU6kPrV7a/ak7cdL99V1x1MDAxMpcwt+PlNWO/XHUwMDEzc3JJfFx1MDAxM1BcdTAwMDDEJY6j0TB5ROMm4ldcdTAwMWX1UVx1MDAxYn1cdTAwMTfcrT+KxmOE4n4yalx1MDAxOFTNzOK1S5thpsBP1Tbx4k1x00hdXHUwMDExfFx1MDAxNvmPM8qLNs9cdTAwMTituJP7alxcQnEpOFx0XHUwMDFkfur+2+7fdn9hO2CMVlxuLrYzt1x1MDAxYk2Iq2qhTX5DOZsw3FLYPd1Zc+aO1TvT2jWDbfZ46px+XHUwMDAwcU5t0CJ9<!-- payload-end -->
   <defs>
     <style class="style-fonts">
-      @font-face {
-        font-family: "ComicNeue";
-        src: url("https://draw-next.sparkwise.co/ComicNeue-Regular.woff2");
-      }
       @font-face {
         font-family: "Cascadia";
         src: url("https://draw-next.sparkwise.co/Cascadia.woff2");

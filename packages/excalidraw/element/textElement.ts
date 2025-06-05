@@ -944,7 +944,7 @@ export const isMeasureTextSupported = () => {
 const DEFAULT_LINE_HEIGHT = {
   // ~1.25 is the average for Virgil in WebKit and Blink.
   // Gecko (FF) uses ~1.28.
-  [FONT_FAMILY.ComicNeue]: 1.25 as ExcalidrawTextElement["lineHeight"],
+  [FONT_FAMILY.ProximaNova]: 1.25 as ExcalidrawTextElement["lineHeight"],
   // ~1.15 is the average for Virgil in WebKit and Blink.
   // Gecko if all over the place.
   [FONT_FAMILY.Inter]: 1.15 as ExcalidrawTextElement["lineHeight"],

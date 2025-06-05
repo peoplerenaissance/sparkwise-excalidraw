@@ -753,7 +753,7 @@ export const actionChangeFontFamily = register({
       testId: string;
     }[] = [
       {
-        value: FONT_FAMILY.ComicNeue,
+        value: FONT_FAMILY.ProximaNova,
         text: t("labels.handDrawn"),
         icon: FreedrawIcon,
         testId: "font-family-handdrawn",
