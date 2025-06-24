@@ -5,7 +5,7 @@
 /* https://github.com/microsoft/cascadia-code */
 @font-face {
   font-family: "Cascadia";
-  src: url("Cascadia.woff2");
+  src: url("/fonts/Cascadia.woff2");
   font-display: swap;
 }
 
@@ -13,13 +13,13 @@
 /* Handwritten style font */
 @font-face {
   font-family: "ProximaNova";
-  src: url("ProximaNova-Regular.woff2");
+  src: url("/fonts/ProximaNova-Regular.woff2");
   font-display: swap;
   font-weight: 400;
 }
 @font-face {
   font-family: "ProximaNova";
-  src: url("ProximaNova-SemiBold.woff2");
+  src: url("/fonts/ProximaNova-SemiBold.woff2");
   font-display: swap;
   font-weight: 600;
 }
