@@ -381,7 +381,8 @@ export const exportToSvg = async (
       }`;
 
     if (assetPath?.startsWith("/")) {
-      assetPath = assetPath.replace("/", `${window.location.origin}/`);
+      const origin = window.location.origin || "https://draw-prod.sparkwise.co";
+      assetPath = assetPath.replace("/", `${origin}/`);
     }
     assetPath = `${assetPath}/dist/excalidraw-assets/`;
   }
