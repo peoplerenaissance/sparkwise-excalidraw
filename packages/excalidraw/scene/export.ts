@@ -371,13 +371,13 @@ export const exportToSvg = async (
     svgRoot.setAttribute("filter", THEME_FILTER);
   }
 
-  let assetPath = "https://draw-next.sparkwise.co/";
+  let assetPath = "https://draw-prod.sparkwise.co/";
   // Asset path needs to be determined only when using package
   if (import.meta.env.VITE_IS_EXCALIDRAW_NPM_PACKAGE) {
     assetPath =
       window.EXCALIDRAW_ASSET_PATH ||
       `https://unpkg.com/${import.meta.env.VITE_PKG_NAME}@${
-        import.meta.env.PKG_VERSION
+        import.meta.env.VITE_PKG_VERSION
       }`;
 
     if (assetPath?.startsWith("/")) {
@@ -415,17 +415,17 @@ export const exportToSvg = async (
     <style class="style-fonts">
       @font-face {
         font-family: "Cascadia";
-        src: url("${assetPath}Cascadia.woff2");
+        src: url("${assetPath}fonts/Cascadia.woff2");
       }
       @font-face {
         font-family: "ProximaNova";
-        src: url("${assetPath}ProximaNova-Regular.woff2");
+        src: url("${assetPath}fonts/ProximaNova-Regular.woff2");
         font-weight: 400;
         font-display: swap;
       }
       @font-face {
         font-family: "ProximaNova";
-        src: url("${assetPath}ProximaNova-SemiBold.woff2");
+        src: url("${assetPath}fonts/ProximaNova-SemiBold.woff2");
         font-weight: 600;
         font-display: swap;
       }

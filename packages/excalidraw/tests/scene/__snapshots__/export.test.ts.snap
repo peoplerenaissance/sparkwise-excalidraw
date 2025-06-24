@@ -23,17 +23,17 @@ exports[`exportToSvg > with default arguments 1`] = `
       
       @font-face {
         font-family: "Cascadia";
-        src: url("https://draw-next.sparkwise.co/Cascadia.woff2");
+        src: url("https://draw-prod.sparkwise.co/fonts/Cascadia.woff2");
       }
       @font-face {
         font-family: "ProximaNova";
-        src: url("https://draw-next.sparkwise.co/ProximaNova-Regular.woff2");
+        src: url("https://draw-prod.sparkwise.co/fonts/ProximaNova-Regular.woff2");
         font-weight: 400;
         font-display: swap;
       }
       @font-face {
         font-family: "ProximaNova";
-        src: url("https://draw-next.sparkwise.co/ProximaNova-SemiBold.woff2");
+        src: url("https://draw-prod.sparkwise.co/fonts/ProximaNova-SemiBold.woff2");
         font-weight: 600;
         font-display: swap;
       }
@@ -92,17 +92,17 @@ exports[`exportToSvg > with elements that have a link 1`] = `
     <style class="style-fonts">
       @font-face {
         font-family: "Cascadia";
-        src: url("https://draw-next.sparkwise.co/Cascadia.woff2");
+        src: url("https://draw-prod.sparkwise.co/fonts/Cascadia.woff2");
       }
       @font-face {
         font-family: "ProximaNova";
-        src: url("https://draw-next.sparkwise.co/ProximaNova-Regular.woff2");
+        src: url("https://draw-prod.sparkwise.co/fonts/ProximaNova-Regular.woff2");
         font-weight: 400;
         font-display: swap;
       }
       @font-face {
         font-family: "ProximaNova";
-        src: url("https://draw-next.sparkwise.co/ProximaNova-SemiBold.woff2");
+        src: url("https://draw-prod.sparkwise.co/fonts/ProximaNova-SemiBold.woff2");
         font-weight: 600;
         font-display: swap;
       }
@@ -120,17 +120,17 @@ exports[`exportToSvg > with exportEmbedScene 1`] = `
     <style class="style-fonts">
       @font-face {
         font-family: "Cascadia";
-        src: url("https://draw-next.sparkwise.co/Cascadia.woff2");
+        src: url("https://draw-prod.sparkwise.co/fonts/Cascadia.woff2");
       }
       @font-face {
         font-family: "ProximaNova";
-        src: url("https://draw-next.sparkwise.co/ProximaNova-Regular.woff2");
+        src: url("https://draw-prod.sparkwise.co/fonts/ProximaNova-Regular.woff2");
         font-weight: 400;
         font-display: swap;
       }
       @font-face {
         font-family: "ProximaNova";
-        src: url("https://draw-next.sparkwise.co/ProximaNova-SemiBold.woff2");
+        src: url("https://draw-prod.sparkwise.co/fonts/ProximaNova-SemiBold.woff2");
         font-weight: 600;
         font-display: swap;
       }

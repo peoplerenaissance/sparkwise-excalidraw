@@ -20,7 +20,7 @@ if (apiKey || options.api_host) {
 
 const SentryEnvHostnameMap: { [key: string]: string } = {
   "draw-prod.sparkwise.co": "production",
-  "draw-next.sparkwise.co": "staging",
+  "draw-client.sparkwise-staging.co": "staging",
 };
 
 // Disable Sentry locally or inside the Docker to avoid noise/respect privacy
