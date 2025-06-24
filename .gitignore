@@ -26,3 +26,5 @@ coverage
 dev-dist
 html
 examples/**/bundle.*
+CLAUDE.md 
+settings.local.json
