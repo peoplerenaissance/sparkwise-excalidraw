@@ -371,13 +371,13 @@ export const exportToSvg = async (
     svgRoot.setAttribute("filter", THEME_FILTER);
   }
 
-  let assetPath = "https://draw-next.sparkwise.co/";
+  let assetPath = "https://draw-prod.sparkwise.co/";
   // Asset path needs to be determined only when using package
   if (import.meta.env.VITE_IS_EXCALIDRAW_NPM_PACKAGE) {
     assetPath =
       window.EXCALIDRAW_ASSET_PATH ||
       `https://unpkg.com/${import.meta.env.VITE_PKG_NAME}@${
-        import.meta.env.PKG_VERSION
+        import.meta.env.VITE_PKG_VERSION
       }`;
 
     if (assetPath?.startsWith("/")) {
