@@ -4,9 +4,7 @@
   "workspaces": [
     "excalidraw-app",
     "packages/excalidraw",
-    "packages/utils",
-    "examples/excalidraw",
-    "examples/excalidraw/*"
+    "packages/utils"
   ],
   "dependencies": {
     "@excalidraw/random-username": "1.0.0",
