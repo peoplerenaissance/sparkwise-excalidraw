@@ -1,11 +1,20 @@
 import throttle from "lodash.throttle";
 import { PureComponent } from "react";
 import {
+  Collaborator,
   ExcalidrawImperativeAPI,
+  Gesture,
   SocketId,
+  UserIdleState,
 } from "../../packages/excalidraw/types";
 import { ErrorDialog } from "../../packages/excalidraw/components/ErrorDialog";
-import { APP_NAME, ENV, EVENT } from "../../packages/excalidraw/constants";
+import {
+  ACTIVE_THRESHOLD,
+  APP_NAME,
+  ENV,
+  EVENT,
+  IDLE_THRESHOLD,
+} from "../../packages/excalidraw/constants";
 import { ImportedDataState } from "../../packages/excalidraw/data/types";
 import {
   ExcalidrawElement,
@@ -16,7 +25,6 @@ import {
   restoreElements,
   zoomToFitBounds,
 } from "../../packages/excalidraw/index";
-import { Collaborator, Gesture } from "../../packages/excalidraw/types";
 import {
   assertNever,
   getUserColorFromSearchParams,
@@ -30,9 +38,9 @@ import {
   FILE_UPLOAD_MAX_BYTES,
   INITIAL_SCENE_UPDATE_TIMEOUT,
   LOAD_IMAGES_TIMEOUT,
-  WS_SUBTYPES,
   SYNC_FULL_SCENE_INTERVAL_MS,
   WS_EVENTS,
+  WS_SUBTYPES,
 } from "../app_constants";
 import {
   generateCollaborationLinkData,
@@ -43,19 +51,14 @@ import {
 } from "../data";
 import {
   isSavedToHttpStorage,
-  saveToHttpStorage,
+  loadFilesFromHttpStorage,
   loadFromHttpStorage,
   saveFilesToHttpStorage,
-  loadFilesFromHttpStorage,
+  saveToHttpStorage,
   TokenService,
 } from "../data/httpStorage";
 import Portal from "./Portal";
 import { t } from "../../packages/excalidraw/i18n";
-import { UserIdleState } from "../../packages/excalidraw/types";
-import {
-  IDLE_THRESHOLD,
-  ACTIVE_THRESHOLD,
-} from "../../packages/excalidraw/constants";
 import {
   encodeFilesForUpload,
   FileManager,
@@ -303,9 +306,9 @@ class Collab extends PureComponent<CollabProps, CollabState> {
       //   );
       // }
     } catch (error: any) {
+      // firestore doesn't return a specific error code when size exceeded
       const sizeExceeded = /is longer than.*?bytes/.test(error.message);
       this.setState({
-        // firestore doesn't return a specific error code when size exceeded
         errorMessage: sizeExceeded
           ? t("errors.collabSaveFailed_sizeExceeded")
           : t("errors.collabSaveFailed"),
