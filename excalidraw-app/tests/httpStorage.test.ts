@@ -37,6 +37,12 @@ const makeTokenService = (): TokenService => {
   return ts;
 };
 
+const makeFailingTokenService = (error: string): TokenService => {
+  const ts = new TokenService();
+  vi.spyOn(ts, "getToken").mockRejectedValue(new Error(error));
+  return ts;
+};
+
 const emptyAppState = {} as AppState;
 
 const mockFetchResponses = (responses: Response[]) => {
@@ -147,7 +153,7 @@ describe("saveToHttpStorage", () => {
     },
   );
 
-  it("returns saved:false when GET fails with non-404 status", async () => {
+  it("returns saved:false with reason when GET fails", async () => {
     const portal = makePortal();
 
     mockFetchResponses([new Response(null, { status: 500 })]);
@@ -159,10 +165,14 @@ describe("saveToHttpStorage", () => {
       emptyAppState,
     );
 
-    expect(result).toEqual({ saved: false, reconciledElements: null });
+    expect(result.saved).toBe(false);
+    expect(result.reconciledElements).toBeNull();
+    if (!result.saved) {
+      expect(result.reason).toBe("get_failed");
+    }
   });
 
-  it("returns saved:false when POST fails", async () => {
+  it("returns saved:false with reason when POST fails", async () => {
     const portal = makePortal();
 
     mockFetchResponses([
@@ -177,7 +187,10 @@ describe("saveToHttpStorage", () => {
       emptyAppState,
     );
 
-    expect(result).toEqual({ saved: false, reconciledElements: null });
+    expect(result.saved).toBe(false);
+    if (!result.saved) {
+      expect(result.reason).toBe("post_failed");
+    }
   });
 
   it("skips save when no room exists", async () => {
@@ -194,5 +207,134 @@ describe("saveToHttpStorage", () => {
 
     expect(result).toEqual({ saved: true, reconciledElements: null });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns saved:false on token service failure (does not throw)", async () => {
+    const portal = makePortal();
+
+    mockFetchResponses([]);
+
+    const result = await saveToHttpStorage(
+      portal,
+      [createElement("A", 1)],
+      makeFailingTokenService("Request timeout"),
+      emptyAppState,
+    );
+
+    expect(result.saved).toBe(false);
+    if (!result.saved) {
+      expect(result.reason).toBe("token_error");
+    }
+  });
+
+  it("returns saved:false on network error during GET (does not throw)", async () => {
+    const portal = makePortal();
+
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await saveToHttpStorage(
+      portal,
+      [createElement("A", 1)],
+      makeTokenService(),
+      emptyAppState,
+    );
+
+    expect(result.saved).toBe(false);
+    if (!result.saved) {
+      expect(result.reason).toBe("network_error");
+    }
+  });
+
+  it("returns saved:false on network error during POST (does not throw)", async () => {
+    const portal = makePortal();
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await saveToHttpStorage(
+      portal,
+      [createElement("A", 1)],
+      makeTokenService(),
+      emptyAppState,
+    );
+
+    expect(result.saved).toBe(false);
+    if (!result.saved) {
+      expect(result.reason).toBe("network_error");
+    }
+  });
+
+  it("returns saved:false on malformed response JSON (does not throw)", async () => {
+    const portal = makePortal();
+
+    mockFetchResponses([
+      new Response("not json", {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    ]);
+
+    const result = await saveToHttpStorage(
+      portal,
+      [createElement("A", 1)],
+      makeTokenService(),
+      emptyAppState,
+    );
+
+    expect(result.saved).toBe(false);
+    if (!result.saved) {
+      expect(result.reason).toBe("parse_error");
+    }
+  });
+
+  it.each([401, 403])(
+    "returns auth_error and clears token on %i response",
+    async (status) => {
+      const portal = makePortal();
+      const tokenService = makeTokenService();
+      const clearSpy = vi.spyOn(tokenService, "clearToken");
+
+      mockFetchResponses([new Response(null, { status })]);
+
+      const result = await saveToHttpStorage(
+        portal,
+        [createElement("A", 1)],
+        tokenService,
+        emptyAppState,
+      );
+
+      expect(result.saved).toBe(false);
+      if (!result.saved) {
+        expect(result.reason).toBe("auth_error");
+      }
+      expect(clearSpy).toHaveBeenCalled();
+    },
+  );
+
+  it("returns size_exceeded on 413 response from POST", async () => {
+    const portal = makePortal();
+
+    mockFetchResponses([
+      new Response(null, { status: 404 }),
+      new Response(null, { status: 413 }),
+    ]);
+
+    const result = await saveToHttpStorage(
+      portal,
+      [createElement("A", 1)],
+      makeTokenService(),
+      emptyAppState,
+    );
+
+    expect(result.saved).toBe(false);
+    if (!result.saved) {
+      expect(result.reason).toBe("size_exceeded");
+    }
   });
 });
