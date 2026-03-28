@@ -280,13 +280,13 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     ) {
       // this won't run in time if user decides to leave the site, but
       //  the purpose is to run in immediately after user decides to stay
-      this.saveCollabRoomToFirebase(syncableElements);
+      this.saveCollabRoomToHttpStorage(syncableElements);
 
       preventUnload(event);
     }
   });
 
-  saveCollabRoomToFirebase = async (
+  saveCollabRoomToHttpStorage = async (
     syncableElements: readonly SyncableExcalidrawElement[],
   ) => {
     try {
@@ -325,10 +325,10 @@ class Collab extends PureComponent<CollabProps, CollabState> {
 
   stopCollaboration = (keepRemoteState = true) => {
     this.queueBroadcastAllElements.cancel();
-    this.queueSaveToFirebase.cancel();
+    this.queueSaveToHttpStorage.cancel();
     this.loadImageFiles.cancel();
 
-    this.saveCollabRoomToFirebase(
+    this.saveCollabRoomToHttpStorage(
       getSyncableElements(
         this.excalidrawAPI.getSceneElementsIncludingDeleted(),
       ),
@@ -519,7 +519,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
         commitToHistory: true,
       });
 
-      this.saveCollabRoomToFirebase(getSyncableElements(elements));
+      this.saveCollabRoomToHttpStorage(getSyncableElements(elements));
     }
 
     // fallback in case you're not alone in the room but still don't receive
@@ -949,7 +949,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
 
   syncElements = (elements: readonly ExcalidrawElement[]) => {
     this.broadcastElements(elements);
-    this.queueSaveToFirebase();
+    this.queueSaveToHttpStorage();
   };
 
   queueBroadcastAllElements = throttle(() => {
@@ -966,10 +966,10 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     this.setLastBroadcastedOrReceivedSceneVersion(newVersion);
   }, SYNC_FULL_SCENE_INTERVAL_MS);
 
-  queueSaveToFirebase = throttle(
+  queueSaveToHttpStorage = throttle(
     () => {
       if (this.portal.socketInitialized) {
-        this.saveCollabRoomToFirebase(
+        this.saveCollabRoomToHttpStorage(
           getSyncableElements(
             this.excalidrawAPI.getSceneElementsIncludingDeleted(),
           ),

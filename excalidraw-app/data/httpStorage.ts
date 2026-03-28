@@ -253,13 +253,14 @@ export const saveToHttpStorage = async (
         appState,
       );
       elementsToWrite = reconciledElements;
-
-      // If reconciled version matches cache, nothing new to save
-      const reconciledVersion = getSceneVersion(reconciledElements);
-      if (httpStorageSceneVersionCache.get(socket) === reconciledVersion) {
-        return { saved: true, reconciledElements };
-      }
     }
+  }
+
+  const versionToWrite = getSceneVersion(elementsToWrite);
+
+  // If reconciled version matches cache, nothing new to save
+  if (httpStorageSceneVersionCache.get(socket) === versionToWrite) {
+    return { saved: true, reconciledElements };
   }
 
   console.info("[draw] Saving drawing data...");
@@ -281,7 +282,7 @@ export const saveToHttpStorage = async (
   });
 
   if (putResponse.ok) {
-    httpStorageSceneVersionCache.set(socket, getSceneVersion(elementsToWrite));
+    httpStorageSceneVersionCache.set(socket, versionToWrite);
     return { saved: true, reconciledElements };
   }
   return { saved: false, reconciledElements: null };
