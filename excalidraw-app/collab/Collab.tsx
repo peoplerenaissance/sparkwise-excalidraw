@@ -286,25 +286,26 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     }
   });
 
-  // TODO (Jess): consider renaming to "saveCollabRoomToHttpStorage"
   saveCollabRoomToFirebase = async (
     syncableElements: readonly SyncableExcalidrawElement[],
   ) => {
     try {
-      // TODO (Jess): Firebase uses app state when saving, consider if we should use this too
-      await saveToHttpStorage(
+      const savedData = await saveToHttpStorage(
         this.portal,
         syncableElements,
         this.tokenService,
-        // this.excalidrawAPI.getAppState(),
+        this.excalidrawAPI.getAppState(),
       );
 
-      // TODO (Jess): current httpStorage does not use reconciliation, but consider if this should be included
-      // if (this.isCollaborating() && savedData && savedData.reconciledElements) {
-      //   this.handleRemoteSceneUpdate(
-      //     this.reconcileElements(savedData.reconciledElements),
-      //   );
-      // }
+      if (
+        this.isCollaborating() &&
+        savedData.saved &&
+        savedData.reconciledElements
+      ) {
+        this.handleRemoteSceneUpdate(
+          this.reconcileElements(savedData.reconciledElements),
+        );
+      }
     } catch (error: any) {
       // firestore doesn't return a specific error code when size exceeded
       const sizeExceeded = /is longer than.*?bytes/.test(error.message);
