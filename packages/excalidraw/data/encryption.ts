@@ -45,7 +45,7 @@ export const getCryptoKey = (key: string, usage: KeyUsage) =>
     [usage],
   );
 
-// TODO (Jess): Reconsider if we want to use this
+// Backend handles auth/transport security
 export const encryptData = async (
   key: string | CryptoKey,
   data: Uint8Array | ArrayBuffer | Blob | File | string,
