@@ -246,11 +246,7 @@ export const saveToHttpStorage = async (
   if (getResponse.ok) {
     const existingElements = await getSyncableElementsFromResponse(getResponse);
 
-    if (
-      existingElements &&
-      existingElements.length > 0 &&
-      getSceneVersion(existingElements) !== getSceneVersion(elements)
-    ) {
+    if (existingElements && existingElements.length > 0) {
       reconciledElements = reconcileElements(
         elements,
         existingElements,
