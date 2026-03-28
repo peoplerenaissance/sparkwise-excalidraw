@@ -302,12 +302,12 @@ class Collab extends PureComponent<CollabProps, CollabState> {
         savedData.saved &&
         savedData.reconciledElements
       ) {
-        this.handleRemoteSceneUpdate(
-          this.reconcileElements(savedData.reconciledElements),
+        this.setLastBroadcastedOrReceivedSceneVersion(
+          getSceneVersion(savedData.reconciledElements),
         );
+        this.handleRemoteSceneUpdate(savedData.reconciledElements);
       }
     } catch (error: any) {
-      // firestore doesn't return a specific error code when size exceeded
       const sizeExceeded = /is longer than.*?bytes/.test(error.message);
       this.setState({
         errorMessage: sizeExceeded

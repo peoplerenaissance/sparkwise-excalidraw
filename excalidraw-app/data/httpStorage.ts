@@ -246,7 +246,11 @@ export const saveToHttpStorage = async (
   if (getResponse.ok) {
     const existingElements = await getSyncableElementsFromResponse(getResponse);
 
-    if (existingElements && existingElements.length > 0) {
+    if (
+      existingElements &&
+      existingElements.length > 0 &&
+      getSceneVersion(existingElements) !== getSceneVersion(elements)
+    ) {
       reconciledElements = reconcileElements(
         elements,
         existingElements,
@@ -258,9 +262,9 @@ export const saveToHttpStorage = async (
 
   const versionToWrite = getSceneVersion(elementsToWrite);
 
-  // If reconciled version matches cache, nothing new to save
+  // If version matches cache, nothing new to save
   if (httpStorageSceneVersionCache.get(socket) === versionToWrite) {
-    return { saved: true, reconciledElements };
+    return { saved: true, reconciledElements: null };
   }
 
   console.info("[draw] Saving drawing data...");
