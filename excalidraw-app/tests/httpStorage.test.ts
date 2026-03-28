@@ -20,7 +20,7 @@ const createElement = (
     updated: Date.now(),
     width: 100,
     height: 100,
-  }) as any as ExcalidrawElement;
+  } as any as ExcalidrawElement);
 
 const makePortal = (): Portal => {
   const portal = new Portal(null as any);
