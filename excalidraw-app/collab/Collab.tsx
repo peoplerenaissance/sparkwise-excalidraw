@@ -286,40 +286,56 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     }
   });
 
+  private consecutiveSaveFailures = 0;
+  private static readonly MAX_SAVE_RETRIES = 3;
+
   saveCollabRoomToHttpStorage = async (
     syncableElements: readonly SyncableExcalidrawElement[],
   ) => {
-    try {
-      const savedData = await saveToHttpStorage(
-        this.portal,
-        syncableElements,
-        this.tokenService,
-        this.excalidrawAPI.getAppState(),
-      );
+    const savedData = await saveToHttpStorage(
+      this.portal,
+      syncableElements,
+      this.tokenService,
+      this.excalidrawAPI.getAppState(),
+    );
 
-      if (
-        this.isCollaborating() &&
-        savedData.saved &&
-        savedData.reconciledElements
-      ) {
+    if (savedData.saved) {
+      if (this.consecutiveSaveFailures > 0) {
+        this.consecutiveSaveFailures = 0;
+        this.setState({ errorMessage: null });
+      }
+      if (this.isCollaborating() && savedData.reconciledElements) {
         this.setLastBroadcastedOrReceivedSceneVersion(
           getSceneVersion(savedData.reconciledElements),
         );
         this.handleRemoteSceneUpdate(savedData.reconciledElements);
       }
-    } catch (error: any) {
-      const sizeExceeded = /is longer than.*?bytes/.test(error.message);
+      return;
+    }
+
+    // Size exceeded is not retryable — show error immediately
+    if (savedData.reason === "size_exceeded") {
       this.setState({
-        errorMessage: sizeExceeded
-          ? t("errors.collabSaveFailed_sizeExceeded")
-          : t("errors.collabSaveFailed"),
+        errorMessage: t("errors.collabSaveFailed_sizeExceeded"),
       });
-      console.error(error);
-      if (!sizeExceeded) {
-        setTimeout(() => {
-          window.location.reload();
-        }, 3000);
-      }
+      return;
+    }
+
+    // Other failures — let the throttle retry on the next tick
+    this.consecutiveSaveFailures++;
+    console.warn(
+      `[draw] Save failed (attempt ${this.consecutiveSaveFailures}):`,
+      savedData.reason,
+    );
+
+    if (this.consecutiveSaveFailures >= Collab.MAX_SAVE_RETRIES) {
+      this.setState({
+        errorMessage: t("errors.collabSaveFailed"),
+      });
+      console.error(
+        `[draw] Save failed after ${Collab.MAX_SAVE_RETRIES} consecutive attempts, reason:`,
+        savedData.reason,
+      );
     }
   };
 
@@ -327,6 +343,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     this.queueBroadcastAllElements.cancel();
     this.queueSaveToHttpStorage.cancel();
     this.loadImageFiles.cancel();
+    this.consecutiveSaveFailures = 0;
 
     this.saveCollabRoomToHttpStorage(
       getSyncableElements(
