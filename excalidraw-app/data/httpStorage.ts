@@ -6,6 +6,7 @@ import {
   restoreElements,
 } from "../../packages/excalidraw";
 import {
+  AppState,
   BinaryFileData,
   BinaryFileMetadata,
   DataURL,
@@ -16,7 +17,15 @@ import {
 } from "../../packages/excalidraw/element/types";
 import { decompressData } from "../../packages/excalidraw/data/encode";
 import Portal from "../collab/Portal";
+import {
+  ReconciledElements,
+  reconcileElements,
+} from "../collab/reconciliation";
 import * as Sentry from "@sentry/browser";
+
+export type SaveResult =
+  | { saved: true; reconciledElements: ReconciledElements | null }
+  | { saved: false; reconciledElements: null };
 
 export const encryptElements = async (
   elements: readonly ExcalidrawElement[],
@@ -193,12 +202,12 @@ const getSyncableElementsFromResponse = async (response: Response) => {
   return getSyncableElements(JSON.parse((await response.json()).data) || []);
 };
 
-// TODO (Jess): Consider adding reconciliation here, similar to firebase impl
 export const saveToHttpStorage = async (
   portal: Portal,
   elements: readonly ExcalidrawElement[],
   tokenService: TokenService,
-) => {
+  appState: AppState,
+): Promise<SaveResult> => {
   const { roomId, roomKey, socket } = portal;
   if (
     // if no room exists, consider the room saved because there's nothing we can
@@ -208,13 +217,11 @@ export const saveToHttpStorage = async (
     !socket ||
     isSavedToHttpStorage(portal, elements)
   ) {
-    return true;
+    return { saved: true, reconciledElements: null };
   }
   const token = await tokenService.getToken();
 
   console.info("[draw] Saving to HTTP storage", roomId, roomKey);
-
-  const sceneVersion = getSceneVersion(elements);
 
   const getResponse = await fetch(`${HTTP_STORAGE_BACKEND_URL}/drawing-data`, {
     method: "POST",
@@ -229,20 +236,31 @@ export const saveToHttpStorage = async (
   });
 
   if (!getResponse.ok && getResponse.status !== 404) {
-    return false;
+    return { saved: false, reconciledElements: null };
   }
+
+  // Determine what to write: reconciled (if remote exists) or local-only
+  let elementsToWrite: readonly ExcalidrawElement[] = elements;
+  let reconciledElements: ReconciledElements | null = null;
 
   if (getResponse.ok) {
     const existingElements = await getSyncableElementsFromResponse(getResponse);
 
-    if (existingElements && getSceneVersion(existingElements) >= sceneVersion) {
-      console.info(
-        "[draw] Scene is already saved",
-        sceneVersion,
-        getSceneVersion(existingElements),
+    if (existingElements && existingElements.length > 0) {
+      reconciledElements = reconcileElements(
+        elements,
+        existingElements,
+        appState,
       );
-      return false;
+      elementsToWrite = reconciledElements;
     }
+  }
+
+  const versionToWrite = getSceneVersion(elementsToWrite);
+
+  // If version matches cache, nothing new to save
+  if (httpStorageSceneVersionCache.get(socket) === versionToWrite) {
+    return { saved: true, reconciledElements: null };
   }
 
   console.info("[draw] Saving drawing data...");
@@ -259,15 +277,15 @@ export const saveToHttpStorage = async (
     body: new URLSearchParams({
       roomId,
       roomKey,
-      data: JSON.stringify(elements),
+      data: JSON.stringify(elementsToWrite),
     }),
   });
 
   if (putResponse.ok) {
-    httpStorageSceneVersionCache.set(socket, sceneVersion);
-    return true;
+    httpStorageSceneVersionCache.set(socket, versionToWrite);
+    return { saved: true, reconciledElements };
   }
-  return false;
+  return { saved: false, reconciledElements: null };
 };
 
 // TODO (Jess): might need to look at getSceneVersion... new is using elements
