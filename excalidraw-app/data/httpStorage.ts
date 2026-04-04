@@ -329,8 +329,6 @@ export const saveToHttpStorage = async (
   return { saved: false, reconciledElements: null, reason: "post_failed" };
 };
 
-// TODO (Jess): might need to look at getSceneVersion... new is using elements
-// as a whole, not just version number for the version cache
 export const loadFromHttpStorage = async (
   roomId: string,
   roomKey: string,
@@ -451,8 +449,7 @@ export const loadFilesFromHttpStorage = async (
             id,
             dataURL,
             created: metadata?.created || Date.now(),
-            // TODO (Jess): consider adding:
-            // lastRetrieved: metadata?.created || Date.now(),
+            lastRetrieved: Date.now(),
           });
         } else if (response.status === 403) {
           // Note that we don't consider this an "erroredFile" because we still want
