@@ -6,7 +6,6 @@ import {
   restoreElements,
 } from "../../packages/excalidraw";
 import {
-  AppState,
   BinaryFileData,
   BinaryFileMetadata,
   DataURL,
@@ -17,24 +16,7 @@ import {
 } from "../../packages/excalidraw/element/types";
 import { decompressData } from "../../packages/excalidraw/data/encode";
 import Portal from "../collab/Portal";
-import {
-  ReconciledElements,
-  reconcileElements,
-} from "../collab/reconciliation";
 import * as Sentry from "@sentry/browser";
-
-export type SaveFailureReason =
-  | "token_error"
-  | "network_error"
-  | "auth_error"
-  | "get_failed"
-  | "parse_error"
-  | "size_exceeded"
-  | "post_failed";
-
-export type SaveResult =
-  | { saved: true; reconciledElements: ReconciledElements | null }
-  | { saved: false; reconciledElements: null; reason: SaveFailureReason };
 
 export const encryptElements = async (
   elements: readonly ExcalidrawElement[],
@@ -211,12 +193,12 @@ const getSyncableElementsFromResponse = async (response: Response) => {
   return getSyncableElements(JSON.parse((await response.json()).data) || []);
 };
 
+// TODO (Jess): Consider adding reconciliation here, similar to firebase impl
 export const saveToHttpStorage = async (
   portal: Portal,
   elements: readonly ExcalidrawElement[],
   tokenService: TokenService,
-  appState: AppState,
-): Promise<SaveResult> => {
+) => {
   const { roomId, roomKey, socket } = portal;
   if (
     // if no room exists, consider the room saved because there's nothing we can
@@ -226,109 +208,70 @@ export const saveToHttpStorage = async (
     !socket ||
     isSavedToHttpStorage(portal, elements)
   ) {
-    return { saved: true, reconciledElements: null };
+    return true;
   }
-  let token: string;
-  try {
-    token = await tokenService.getToken();
-  } catch (error) {
-    console.warn("[draw] Token fetch failed:", error);
-    return { saved: false, reconciledElements: null, reason: "token_error" };
-  }
+  const token = await tokenService.getToken();
 
   console.info("[draw] Saving to HTTP storage", roomId, roomKey);
 
-  let getResponse: Response;
-  try {
-    getResponse = await fetch(`${HTTP_STORAGE_BACKEND_URL}/drawing-data`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        roomId,
-        roomKey,
-      }),
-    });
-  } catch (error) {
-    console.warn("[draw] Failed to fetch existing drawing data:", error);
-    return { saved: false, reconciledElements: null, reason: "network_error" };
-  }
+  const sceneVersion = getSceneVersion(elements);
+
+  const getResponse = await fetch(`${HTTP_STORAGE_BACKEND_URL}/drawing-data`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      roomId,
+      roomKey,
+    }),
+  });
 
   if (!getResponse.ok && getResponse.status !== 404) {
-    if (getResponse.status === 401 || getResponse.status === 403) {
-      tokenService.clearToken();
-      return { saved: false, reconciledElements: null, reason: "auth_error" };
-    }
-    return { saved: false, reconciledElements: null, reason: "get_failed" };
+    return false;
   }
-
-  // Determine what to write: reconciled (if remote exists) or local-only
-  let elementsToWrite: readonly ExcalidrawElement[] = elements;
-  let reconciledElements: ReconciledElements | null = null;
 
   if (getResponse.ok) {
-    let existingElements;
-    try {
-      existingElements = await getSyncableElementsFromResponse(getResponse);
-    } catch (error) {
-      console.warn("[draw] Failed to parse existing drawing data:", error);
-      return { saved: false, reconciledElements: null, reason: "parse_error" };
-    }
+    const existingElements = await getSyncableElementsFromResponse(getResponse);
 
-    if (existingElements && existingElements.length > 0) {
-      reconciledElements = reconcileElements(
-        elements,
-        existingElements,
-        appState,
+    if (existingElements && getSceneVersion(existingElements) >= sceneVersion) {
+      console.info(
+        "[draw] Scene is already saved",
+        sceneVersion,
+        getSceneVersion(existingElements),
       );
-      elementsToWrite = reconciledElements;
+      return false;
     }
-  }
-
-  const versionToWrite = getSceneVersion(elementsToWrite);
-
-  // If version matches cache, nothing new to save
-  if (httpStorageSceneVersionCache.get(socket) === versionToWrite) {
-    return { saved: true, reconciledElements: null };
   }
 
   console.info("[draw] Saving drawing data...");
 
-  let putResponse: Response;
-  try {
-    putResponse = await fetch(`${HTTP_STORAGE_BACKEND_URL}/drawing-data`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        roomId,
-        roomKey,
-        data: JSON.stringify(elementsToWrite),
-      }),
-    });
-  } catch (error) {
-    console.warn("[draw] Failed to save drawing data:", error);
-    return { saved: false, reconciledElements: null, reason: "network_error" };
-  }
+  const putHeaders: HeadersInit = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+
+  putHeaders.Authorization = `Bearer ${token}`;
+
+  const putResponse = await fetch(`${HTTP_STORAGE_BACKEND_URL}/drawing-data`, {
+    method: "POST",
+    headers: putHeaders,
+    body: new URLSearchParams({
+      roomId,
+      roomKey,
+      data: JSON.stringify(elements),
+    }),
+  });
 
   if (putResponse.ok) {
-    httpStorageSceneVersionCache.set(socket, versionToWrite);
-    return { saved: true, reconciledElements };
+    httpStorageSceneVersionCache.set(socket, sceneVersion);
+    return true;
   }
-  if (putResponse.status === 401 || putResponse.status === 403) {
-    tokenService.clearToken();
-    return { saved: false, reconciledElements: null, reason: "auth_error" };
-  }
-  if (putResponse.status === 413) {
-    return { saved: false, reconciledElements: null, reason: "size_exceeded" };
-  }
-  return { saved: false, reconciledElements: null, reason: "post_failed" };
+  return false;
 };
 
+// TODO (Jess): might need to look at getSceneVersion... new is using elements
+// as a whole, not just version number for the version cache
 export const loadFromHttpStorage = async (
   roomId: string,
   roomKey: string,
@@ -449,7 +392,8 @@ export const loadFilesFromHttpStorage = async (
             id,
             dataURL,
             created: metadata?.created || Date.now(),
-            lastRetrieved: Date.now(),
+            // TODO (Jess): consider adding:
+            // lastRetrieved: metadata?.created || Date.now(),
           });
         } else if (response.status === 403) {
           // Note that we don't consider this an "erroredFile" because we still want
