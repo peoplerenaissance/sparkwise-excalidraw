@@ -161,6 +161,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
           throw new AbortError();
         }
 
+        // TODO (Jess): Reconsider encoding files for upload
         return saveFilesToHttpStorage({
           files: await encodeFilesForUpload({
             files: addedFiles,
