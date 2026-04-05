@@ -280,34 +280,33 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     ) {
       // this won't run in time if user decides to leave the site, but
       //  the purpose is to run in immediately after user decides to stay
-      this.saveCollabRoomToHttpStorage(syncableElements);
+      this.saveCollabRoomToFirebase(syncableElements);
 
       preventUnload(event);
     }
   });
 
-  saveCollabRoomToHttpStorage = async (
+  // TODO (Jess): consider renaming to "saveCollabRoomToHttpStorage"
+  saveCollabRoomToFirebase = async (
     syncableElements: readonly SyncableExcalidrawElement[],
   ) => {
     try {
-      const savedData = await saveToHttpStorage(
+      // TODO (Jess): Firebase uses app state when saving, consider if we should use this too
+      await saveToHttpStorage(
         this.portal,
         syncableElements,
         this.tokenService,
-        this.excalidrawAPI.getAppState(),
+        // this.excalidrawAPI.getAppState(),
       );
 
-      if (
-        this.isCollaborating() &&
-        savedData.saved &&
-        savedData.reconciledElements
-      ) {
-        this.setLastBroadcastedOrReceivedSceneVersion(
-          getSceneVersion(savedData.reconciledElements),
-        );
-        this.handleRemoteSceneUpdate(savedData.reconciledElements);
-      }
+      // TODO (Jess): current httpStorage does not use reconciliation, but consider if this should be included
+      // if (this.isCollaborating() && savedData && savedData.reconciledElements) {
+      //   this.handleRemoteSceneUpdate(
+      //     this.reconcileElements(savedData.reconciledElements),
+      //   );
+      // }
     } catch (error: any) {
+      // firestore doesn't return a specific error code when size exceeded
       const sizeExceeded = /is longer than.*?bytes/.test(error.message);
       this.setState({
         errorMessage: sizeExceeded
@@ -325,10 +324,10 @@ class Collab extends PureComponent<CollabProps, CollabState> {
 
   stopCollaboration = (keepRemoteState = true) => {
     this.queueBroadcastAllElements.cancel();
-    this.queueSaveToHttpStorage.cancel();
+    this.queueSaveToFirebase.cancel();
     this.loadImageFiles.cancel();
 
-    this.saveCollabRoomToHttpStorage(
+    this.saveCollabRoomToFirebase(
       getSyncableElements(
         this.excalidrawAPI.getSceneElementsIncludingDeleted(),
       ),
@@ -519,7 +518,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
         commitToHistory: true,
       });
 
-      this.saveCollabRoomToHttpStorage(getSyncableElements(elements));
+      this.saveCollabRoomToFirebase(getSyncableElements(elements));
     }
 
     // fallback in case you're not alone in the room but still don't receive
@@ -949,7 +948,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
 
   syncElements = (elements: readonly ExcalidrawElement[]) => {
     this.broadcastElements(elements);
-    this.queueSaveToHttpStorage();
+    this.queueSaveToFirebase();
   };
 
   queueBroadcastAllElements = throttle(() => {
@@ -966,10 +965,10 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     this.setLastBroadcastedOrReceivedSceneVersion(newVersion);
   }, SYNC_FULL_SCENE_INTERVAL_MS);
 
-  queueSaveToHttpStorage = throttle(
+  queueSaveToFirebase = throttle(
     () => {
       if (this.portal.socketInitialized) {
-        this.saveCollabRoomToHttpStorage(
+        this.saveCollabRoomToFirebase(
           getSyncableElements(
             this.excalidrawAPI.getSceneElementsIncludingDeleted(),
           ),
