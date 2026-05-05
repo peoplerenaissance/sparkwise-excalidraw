@@ -1,4 +1,4 @@
-import { MermaidOptions } from "@excalidraw/mermaid-to-excalidraw";
+import { MermaidConfig } from "@excalidraw/mermaid-to-excalidraw";
 import { MermaidToExcalidrawResult } from "@excalidraw/mermaid-to-excalidraw/dist/interfaces";
 import {
   DEFAULT_EXPORT_PADDING,
@@ -37,7 +37,7 @@ export interface MermaidToExcalidrawLibProps {
   api: Promise<{
     parseMermaidToExcalidraw: (
       definition: string,
-      options: MermaidOptions,
+      options: MermaidConfig,
     ) => Promise<MermaidToExcalidrawResult>;
   }>;
 }
@@ -78,13 +78,17 @@ export const convertMermaidToExcalidraw = async ({
     let ret;
     try {
       ret = await api.parseMermaidToExcalidraw(mermaidDefinition, {
-        fontSize: DEFAULT_FONT_SIZE,
+        themeVariables: {
+          fontSize: DEFAULT_FONT_SIZE.toString(),
+        },
       });
     } catch (err: any) {
       ret = await api.parseMermaidToExcalidraw(
         mermaidDefinition.replace(/"/g, "'"),
         {
-          fontSize: DEFAULT_FONT_SIZE,
+          themeVariables: {
+            fontSize: DEFAULT_FONT_SIZE.toString(),
+          },
         },
       );
     }
@@ -95,7 +99,7 @@ export const convertMermaidToExcalidraw = async ({
       elements: convertToExcalidrawElements(elements, {
         regenerateIds: true,
       }),
-      files,
+      files: files || null,
     };
 
     const canvas = await exportToCanvas({
