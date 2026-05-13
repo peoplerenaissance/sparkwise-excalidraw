@@ -21,7 +21,7 @@ const parseMermaidToExcalidrawSpy = vi.spyOn(
 parseMermaidToExcalidrawSpy.mockImplementation(
   async (
     definition: string,
-    options?: MermaidToExcalidraw.MermaidOptions | undefined,
+    options?: MermaidToExcalidraw.MermaidConfig | undefined,
   ) => {
     const firstLine = definition.split("\n")[0];
     return new Promise((resolve, reject) => {
