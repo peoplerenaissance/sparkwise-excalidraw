@@ -39,6 +39,7 @@ import {
   INITIAL_SCENE_UPDATE_TIMEOUT,
   LOAD_IMAGES_TIMEOUT,
   SYNC_FULL_SCENE_INTERVAL_MS,
+  SAVE_TO_BACKEND_INTERVAL_MS,
   WS_EVENTS,
   WS_SUBTYPES,
 } from "../app_constants";
@@ -130,6 +131,13 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   private socketInitializationTimer?: number;
   private lastBroadcastedOrReceivedSceneVersion: number = -1;
   private collaborators = new Map<SocketId, Collaborator>();
+  private parentAllowedOrigins = (
+    import.meta.env.VITE_APP_TOKEN_SERVICE_ALLOWED_ORIGINS || ""
+  )
+    .split(",")
+    .map((origin: string) => origin.trim())
+    .filter(Boolean);
+  private inFlightSave: Promise<unknown> = Promise.resolve();
 
   constructor(props: CollabProps) {
     super(props);
@@ -187,6 +195,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     window.addEventListener("online", this.onOfflineStatusToggle);
     window.addEventListener("offline", this.onOfflineStatusToggle);
     window.addEventListener(EVENT.UNLOAD, this.onUnload);
+    window.addEventListener("message", this.handleParentMessage);
 
     const unsubOnUserFollow = this.excalidrawAPI.onUserFollow((payload) => {
       this.portal.socket && this.portal.broadcastUserFollowed(payload);
@@ -236,11 +245,29 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     appJotaiStore.set(isOfflineAtom, !window.navigator.onLine);
   };
 
+  private handleParentMessage = async (event: MessageEvent) => {
+    if (
+      !this.parentAllowedOrigins.includes(event.origin) ||
+      event.data?.type !== "FLUSH_SAVE"
+    ) {
+      return;
+    }
+    const { requestId } = event.data;
+    console.info("[draw][collab] FLUSH_SAVE received");
+    this.queueSaveToFirebase.flush();
+    await this.inFlightSave;
+    event.source?.postMessage(
+      { type: "FLUSH_SAVE_COMPLETE", requestId },
+      { targetOrigin: event.origin },
+    );
+  };
+
   componentWillUnmount() {
     window.removeEventListener("online", this.onOfflineStatusToggle);
     window.removeEventListener("offline", this.onOfflineStatusToggle);
     window.removeEventListener(EVENT.BEFORE_UNLOAD, this.beforeUnload);
     window.removeEventListener(EVENT.UNLOAD, this.onUnload);
+    window.removeEventListener("message", this.handleParentMessage);
     window.removeEventListener(EVENT.POINTER_MOVE, this.onPointerMove);
     window.removeEventListener(
       EVENT.VISIBILITY_CHANGE,
@@ -292,12 +319,13 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   ) => {
     try {
       // TODO (Jess): Firebase uses app state when saving, consider if we should use this too
-      await saveToHttpStorage(
+      this.inFlightSave = saveToHttpStorage(
         this.portal,
         syncableElements,
         this.tokenService,
         // this.excalidrawAPI.getAppState(),
       );
+      await this.inFlightSave;
 
       // TODO (Jess): current httpStorage does not use reconciliation, but consider if this should be included
       // if (this.isCollaborating() && savedData && savedData.reconciledElements) {
@@ -975,7 +1003,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
         );
       }
     },
-    SYNC_FULL_SCENE_INTERVAL_MS,
+    SAVE_TO_BACKEND_INTERVAL_MS,
     { leading: false },
   );
 
