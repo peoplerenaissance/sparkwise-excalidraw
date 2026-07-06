@@ -356,10 +356,15 @@ import {
 } from "../scene/selection";
 import { actionPaste } from "../actions/actionClipboard";
 import {
+  actionCopyViewportParams,
   actionRemoveAllElementsFromFrame,
   actionSelectAllElementsInFrame,
 } from "../actions/actionFrame";
-import { actionToggleHandTool, zoomToFit } from "../actions/actionCanvas";
+import {
+  actionToggleHandTool,
+  getViewportHomeView,
+  zoomToFit,
+} from "../actions/actionCanvas";
 import { jotaiStore } from "../jotai";
 import { activeConfirmDialogAtom } from "./ActiveConfirmDialog";
 import { ImageSceneDataError } from "../errors";
@@ -2274,8 +2279,15 @@ class App extends React.Component<AppProps, AppState> {
       };
     }
     const scene = restore(initialData, null, null, { repairBindings: true });
+    // In the compact learner modes (where the frame tool is also hidden),
+    // frames render invisibly: no outline, name, or clipping. Their inertness
+    // (non-selectable, non-adopting) is enforced separately at the interaction
+    // sites via inLearnerUiMode(), not via this render flag.
     scene.appState = {
       ...scene.appState,
+      frameRendering: this.inLearnerUiMode()
+        ? { enabled: false, clip: false, name: false, outline: false }
+        : scene.appState.frameRendering,
       theme: this.props.theme || scene.appState.theme,
       // we're falling back to current (pre-init) state when deciding
       // whether to open the library, to handle a case where we
@@ -2305,6 +2317,19 @@ class App extends React.Component<AppProps, AppState> {
         ),
       };
     }
+    // A `?viewport=x,y,w,h` URL param fits and centers that scene rectangle as
+    // the session's home view. It is applied last so it wins over both the
+    // restored/reconciled camera and the scrollToContent fit-all above.
+    const homeView = getViewportHomeView({
+      ...scene.appState,
+      width: this.state.width,
+      height: this.state.height,
+      offsetTop: this.state.offsetTop,
+      offsetLeft: this.state.offsetLeft,
+    });
+    if (homeView) {
+      scene.appState = { ...scene.appState, ...homeView };
+    }
     // FontFaceSet loadingdone event we listen on may not always fire
     // (looking at you Safari), so on init we manually load fonts for current
     // text elements on canvas, and rerender them once done. This also
@@ -2316,6 +2341,17 @@ class App extends React.Component<AppProps, AppState> {
       ...scene,
       commitToHistory: true,
     });
+  };
+
+  /**
+   * The compact learner UI modes (where the frame tool is also hidden). In
+   * these modes frames are invisible and inert. Keyed on the immutable
+   * `UIOptions.mode`, not on the user-toggleable `frameRendering` flag, so
+   * toggling frame rendering in an author mode never affects interactivity.
+   */
+  private inLearnerUiMode = () => {
+    const mode = this.props.UIOptions.mode;
+    return mode === "none" || mode === "minimal";
   };
 
   private isMobileBreakpoint = (width: number, height: number) => {
@@ -2477,12 +2513,45 @@ class App extends React.Component<AppProps, AppState> {
       .getElementsIncludingDeleted()
       .forEach((element) => ShapeCache.delete(element));
     this.refreshViewportBreakpoints();
-    this.updateDOMRect();
+    const prevWidth = this.state.width;
+    const prevHeight = this.state.height;
+    // Re-apply the `?viewport=` home view once the new dimensions have settled,
+    // so the framed region stays centered as the window changes shape.
+    this.updateDOMRect(() =>
+      this.maybeReapplyViewportHomeView(prevWidth, prevHeight),
+    );
     if (!supportsResizeObserver) {
       this.refreshEditorBreakpoints();
     }
     this.setState({});
   });
+
+  /**
+   * Re-fit the `?viewport=` home view after a resize, but only on a genuine
+   * dimension change and never while the learner is mid-edit or following a
+   * collaborator — otherwise a mobile soft keyboard or a follow-mode update
+   * would yank the camera out from under them.
+   */
+  private maybeReapplyViewportHomeView = (
+    prevWidth: number,
+    prevHeight: number,
+  ) => {
+    const dimsChanged =
+      this.state.width !== prevWidth || this.state.height !== prevHeight;
+    if (
+      !dimsChanged ||
+      this.state.cursorButton === "down" || // mid pointer gesture (drag/draw)
+      this.state.editingElement ||
+      this.state.editingFrame ||
+      this.state.userToFollow
+    ) {
+      return;
+    }
+    const homeView = getViewportHomeView(this.state);
+    if (homeView) {
+      this.setState(homeView);
+    }
+  };
 
   /** generally invoked only if fullscreen was invoked programmatically */
   private onFullscreenChange = () => {
@@ -4374,7 +4443,7 @@ class App extends React.Component<AppProps, AppState> {
     includeBoundTextElement: boolean = false,
     includeLockedElements: boolean = false,
   ): NonDeleted<ExcalidrawElement>[] {
-    const elements =
+    let elements =
       includeBoundTextElement && includeLockedElements
         ? this.scene.getNonDeletedElements()
         : this.scene
@@ -4385,6 +4454,12 @@ class App extends React.Component<AppProps, AppState> {
                 (includeBoundTextElement ||
                   !(isTextElement(element) && element.containerId)),
             );
+
+    // In learner modes frames are inert — exclude them from hit-testing so a
+    // click on a frame's body or name never selects or drags the frame.
+    if (this.inLearnerUiMode()) {
+      elements = elements.filter((element) => !isFrameLikeElement(element));
+    }
 
     return getElementsAtPosition(elements, (element) =>
       hitTest(
@@ -4775,6 +4850,11 @@ class App extends React.Component<AppProps, AppState> {
     x: number;
     y: number;
   }) => {
+    // In learner modes frames are inert — nothing is adopted into them, so a
+    // learner's new or dragged elements never gain a frameId.
+    if (this.inLearnerUiMode()) {
+      return null;
+    }
     const frames = this.scene
       .getNonDeletedFramesLikes()
       .filter((frame): frame is ExcalidrawFrameLikeElement =>
@@ -7366,10 +7446,17 @@ class App extends React.Component<AppProps, AppState> {
               shouldReuseSelection = false;
             }
           }
-          const elementsWithinSelection = getElementsWithinSelection(
+          let elementsWithinSelection = getElementsWithinSelection(
             elements,
             draggingElement,
           );
+          // In learner modes frames are inert — a marquee-select must not grab
+          // (and let the learner then move/delete) an invisible frame.
+          if (this.inLearnerUiMode()) {
+            elementsWithinSelection = elementsWithinSelection.filter(
+              (element) => !isFrameLikeElement(element),
+            );
+          }
 
           this.setState((prevState) => {
             const nextSelectedElementIds = {
@@ -9290,6 +9377,7 @@ class App extends React.Component<AppProps, AppState> {
       actionPaste,
       actionSelectAllElementsInFrame,
       actionRemoveAllElementsFromFrame,
+      actionCopyViewportParams,
       CONTEXT_MENU_SEPARATOR,
       ...options,
       CONTEXT_MENU_SEPARATOR,

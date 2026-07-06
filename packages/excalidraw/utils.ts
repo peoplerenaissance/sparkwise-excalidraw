@@ -1090,6 +1090,73 @@ export const getUserColorFromSearchParams = (id?: string): string => {
   return _userColor;
 };
 
+/** A scene-space rectangle: origin (x, y) with positive width/height. */
+export type ViewportRect = { x: number; y: number; w: number; h: number };
+
+/**
+ * Parse the value of the `?viewport=` param ("x,y,w,h" in scene coordinates)
+ * into a rectangle, or return `null` when the value is absent or malformed.
+ * Pure over its input so it can be tested without the module-level cache below.
+ * The value arrives already percent-decoded (URLSearchParams handles that).
+ * x/y may be negative; w/h must be finite and strictly positive.
+ */
+export const parseViewportValue = (
+  value: string | null,
+): ViewportRect | null => {
+  if (!value) {
+    return null;
+  }
+
+  const parts = value.split(",");
+  if (parts.length !== 4) {
+    return null;
+  }
+
+  const nums: number[] = [];
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed === "") {
+      return null;
+    }
+    const n = Number(trimmed);
+    if (!Number.isFinite(n)) {
+      return null;
+    }
+    nums.push(n);
+  }
+
+  const [x, y, w, h] = nums;
+  if (w <= 0 || h <= 0) {
+    return null;
+  }
+
+  return { x, y, w, h };
+};
+
+let _viewport: ViewportRect | null | undefined;
+export const getViewportFromSearchParams = (): ViewportRect | null => {
+  if (_viewport === undefined) {
+    _viewport = parseViewportValue(
+      new URLSearchParams(window.location.search).get("viewport"),
+    );
+  }
+  return _viewport;
+};
+
+/**
+ * Serialize a rectangle into the full `viewport=x,y,w,h` query param string
+ * (integers), the inverse of parseViewportValue. Used by the frame
+ * "copy viewport params" action. Width and height are clamped to at least 1 so
+ * the output always parses back to a valid rectangle.
+ */
+export const formatViewportParam = (rect: ViewportRect): string => {
+  const x = Math.round(rect.x);
+  const y = Math.round(rect.y);
+  const w = Math.max(1, Math.round(rect.w));
+  const h = Math.max(1, Math.round(rect.h));
+  return `viewport=${x},${y},${w},${h}`;
+};
+
 // -----------------------------------------------------------------------------
 type HasBrand<T> = {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
