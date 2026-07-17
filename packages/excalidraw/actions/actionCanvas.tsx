@@ -10,7 +10,12 @@ import { getNormalizedZoom } from "../scene";
 import { calculateScrollCenter, centerScrollOn } from "../scene/scroll";
 import { getStateForZoom } from "../scene/zoom";
 import { AppState, NormalizedZoomValue, UIOptions } from "../types";
-import { getShortcutKey, getUiMode, updateActiveTool } from "../utils";
+import {
+  getShortcutKey,
+  getUiMode,
+  getViewportFromSearchParams,
+  updateActiveTool,
+} from "../utils";
 import { register } from "./register";
 import { Tooltip } from "../components/Tooltip";
 import { newElementWith } from "../element/mutateElement";
@@ -207,11 +212,45 @@ export const actionResetZoom = register({
     (event[KEYS.CTRL_OR_CMD] || event.shiftKey),
 });
 
+/**
+ * Compute the scroll/zoom that fits and centers the `?viewport=` rectangle in
+ * the current window, or `null` when no valid viewport param is present. Shared
+ * by scene init, the sticky-resize re-fit, and reset-zoom so all three land on
+ * the same home view. Reads width/height/openSidebar from the passed appState.
+ */
+export const getViewportHomeView = (
+  appState: Readonly<AppState>,
+): Pick<AppState, "scrollX" | "scrollY" | "zoom"> | null => {
+  const viewport = getViewportFromSearchParams();
+  if (!viewport) {
+    return null;
+  }
+  const { scrollX, scrollY, zoom } = zoomToFitBounds({
+    bounds: [
+      viewport.x,
+      viewport.y,
+      viewport.x + viewport.w,
+      viewport.y + viewport.h,
+    ],
+    appState,
+    fitToViewport: true,
+    viewportZoomFactor: 1,
+  }).appState;
+  return { scrollX, scrollY, zoom };
+};
+
 const resetZoomByCalculateScrollCenter = (
   elements: readonly ExcalidrawElement[],
   appState: AppState,
   mode: UIOptions["mode"],
 ) => {
+  // When a `?viewport=` home view is set, reset returns to it rather than to
+  // fit-all or 100%.
+  const homeView = getViewportHomeView(appState);
+  if (homeView) {
+    return homeView;
+  }
+
   if (mode === "all") {
     return getStateForZoom(
       {

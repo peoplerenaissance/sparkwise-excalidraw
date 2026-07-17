@@ -57,6 +57,15 @@ exports[`contextMenu element > right-clicking on a group should select whole gro
           "category": "history",
         },
       },
+      {
+        "contextItemLabel": "labels.copyViewportParams",
+        "name": "copyViewportParams",
+        "perform": [Function],
+        "predicate": [Function],
+        "trackEvent": {
+          "category": "element",
+        },
+      },
       "separator",
       {
         "contextItemLabel": "labels.copyAsPng",
@@ -4742,6 +4751,15 @@ exports[`contextMenu element > shows 'Group selection' in context menu for multi
           "category": "history",
         },
       },
+      {
+        "contextItemLabel": "labels.copyViewportParams",
+        "name": "copyViewportParams",
+        "perform": [Function],
+        "predicate": [Function],
+        "trackEvent": {
+          "category": "element",
+        },
+      },
       "separator",
       {
         "contextItemLabel": "labels.copyAsPng",
@@ -5327,6 +5345,15 @@ exports[`contextMenu element > shows 'Ungroup selection' in context menu for gro
         "predicate": [Function],
         "trackEvent": {
           "category": "history",
+        },
+      },
+      {
+        "contextItemLabel": "labels.copyViewportParams",
+        "name": "copyViewportParams",
+        "perform": [Function],
+        "predicate": [Function],
+        "trackEvent": {
+          "category": "element",
         },
       },
       "separator",
@@ -6258,6 +6285,15 @@ exports[`contextMenu element > shows context menu for element > [end of test] ap
           "category": "history",
         },
       },
+      {
+        "contextItemLabel": "labels.copyViewportParams",
+        "name": "copyViewportParams",
+        "perform": [Function],
+        "predicate": [Function],
+        "trackEvent": {
+          "category": "element",
+        },
+      },
       "separator",
       {
         "contextItemLabel": "labels.copyAsPng",
@@ -6632,6 +6668,15 @@ exports[`contextMenu element > shows context menu for element > [end of test] ap
         "predicate": [Function],
         "trackEvent": {
           "category": "history",
+        },
+      },
+      {
+        "contextItemLabel": "labels.copyViewportParams",
+        "name": "copyViewportParams",
+        "perform": [Function],
+        "predicate": [Function],
+        "trackEvent": {
+          "category": "element",
         },
       },
       "separator",

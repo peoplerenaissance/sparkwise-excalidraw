@@ -120,6 +120,7 @@ export type ActionName =
   | "toggleHandTool"
   | "selectAllElementsInFrame"
   | "removeAllElementsFromFrame"
+  | "copyViewportParams"
   | "updateFrameRendering"
   | "setFrameAsActiveTool"
   | "setEmbeddableAsActiveTool"

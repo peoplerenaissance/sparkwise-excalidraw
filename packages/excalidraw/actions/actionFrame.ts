@@ -1,10 +1,13 @@
 import { getNonDeletedElements } from "../element";
+import { getElementBounds } from "../element/bounds";
 import { ExcalidrawElement } from "../element/types";
 import { removeAllElementsFromFrame } from "../frame";
 import { getFrameChildren } from "../frame";
 import { KEYS } from "../keys";
 import { AppClassProperties, AppState } from "../types";
-import { updateActiveTool } from "../utils";
+import { formatViewportParam, updateActiveTool } from "../utils";
+import { copyTextToSystemClipboard } from "../clipboard";
+import { t } from "../i18n";
 import { setCursorForShape } from "../cursor";
 import { register } from "./register";
 import { isFrameLikeElement } from "../element/typeChecks";
@@ -81,6 +84,44 @@ export const actionRemoveAllElementsFromFrame = register({
     };
   },
   contextItemLabel: "labels.removeAllElementsFromFrame",
+  predicate: (elements, appState, _, app) =>
+    isSingleFrameSelected(appState, app),
+});
+
+export const actionCopyViewportParams = register({
+  name: "copyViewportParams",
+  trackEvent: { category: "element" },
+  perform: (elements, appState, _, app) => {
+    const selectedElement =
+      app.scene.getSelectedElements(appState).at(0) || null;
+
+    if (!isFrameLikeElement(selectedElement)) {
+      return { elements, appState, commitToHistory: false };
+    }
+
+    // Rotation-safe axis-aligned bounds — getElementBounds returns the correct
+    // AABB even for a programmatically-rotated frame (frames normally enforce
+    // angle 0). formatViewportParam rounds to integers.
+    const [x1, y1, x2, y2] = getElementBounds(selectedElement);
+    const viewportParam = formatViewportParam({
+      x: x1,
+      y: y1,
+      w: x2 - x1,
+      h: y2 - y1,
+    });
+
+    // Fire-and-forget: the clipboard write is async, but the action returns
+    // synchronously so a slow/denied write can't clobber state the user
+    // changed while it was pending. Feedback is surfaced imperatively.
+    copyTextToSystemClipboard(viewportParam)
+      .then(() => app.setToast({ message: t("toast.copyViewportParams") }))
+      .catch(() =>
+        app.setToast({ message: t("errors.copyToSystemClipboardFailed") }),
+      );
+
+    return { elements, appState, commitToHistory: false };
+  },
+  contextItemLabel: "labels.copyViewportParams",
   predicate: (elements, appState, _, app) =>
     isSingleFrameSelected(appState, app),
 });
