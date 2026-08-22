@@ -130,6 +130,25 @@ export const createEmbedBridge = ({
     parentWindow.postMessage(message, parentOrigin);
   };
 
+  const save = debounce(
+    (
+      elements: readonly ExcalidrawElement[],
+      appState: AppState,
+      files: BinaryFiles,
+    ) => {
+      if (destroyed || !loaded) {
+        return;
+      }
+      const scene = serializeAsJSON(elements, appState, files, "local");
+      if (scene === lastScene) {
+        return;
+      }
+      lastScene = scene;
+      post({ type: EMBED_MESSAGE_TYPES.SAVE, scene });
+    },
+    debounceMs,
+  );
+
   const handleMessage = (event: MessageEvent) => {
     if (
       destroyed ||
@@ -139,6 +158,10 @@ export const createEmbedBridge = ({
     ) {
       return;
     }
+    // A load supersedes anything the author drew before it arrived: drop a
+    // pending debounced save so it cannot fire afterwards and hand the parent
+    // the pre-load scene on top of the one it just sent.
+    save.cancel();
     try {
       const parsed = parseEmbeddedScene(event.data.scene);
       const restored = restore(parsed, null, null, { repairBindings: true });
@@ -171,25 +194,6 @@ export const createEmbedBridge = ({
       });
     }
   };
-
-  const save = debounce(
-    (
-      elements: readonly ExcalidrawElement[],
-      appState: AppState,
-      files: BinaryFiles,
-    ) => {
-      if (destroyed || !loaded) {
-        return;
-      }
-      const scene = serializeAsJSON(elements, appState, files, "local");
-      if (scene === lastScene) {
-        return;
-      }
-      lastScene = scene;
-      post({ type: EMBED_MESSAGE_TYPES.SAVE, scene });
-    },
-    debounceMs,
-  );
 
   return {
     start: () => {

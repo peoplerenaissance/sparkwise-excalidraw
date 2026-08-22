@@ -357,6 +357,28 @@ describe("embed bridge", () => {
     bridge.destroy();
   });
 
+  it("a load cancels a pending save so a stale scene never lands on top of it", () => {
+    // The parent persists every save. If it reloads the scene (reset to
+    // template) while a debounced save from the OLD scene is still pending,
+    // that save must not fire afterwards and revert the reload.
+    const { parent, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: sceneDoc(),
+    });
+    change(bridge, ["STALE"]);
+    vi.advanceTimersByTime(100); // debounce still pending
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: JSON.stringify([
+        API.createElement({ type: "rectangle", id: "FRESH" }),
+      ]),
+    });
+    vi.advanceTimersByTime(5000);
+    expect(savesPosted(parent)).toHaveLength(0);
+    bridge.destroy();
+  });
+
   it("stops posting after destroy", () => {
     const { parent, bridge } = setup();
     dispatchMessage(PARENT_ORIGIN, {
