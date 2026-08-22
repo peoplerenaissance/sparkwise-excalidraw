@@ -554,6 +554,56 @@ describe("embed bridge", () => {
     bridge.destroy();
   });
 
+  it("drops appState keys a scene document cannot legitimately carry", () => {
+    // scenes reach us from agents, hand-editing and old revisions; an
+    // unrecognised key must be ignored, never installed and never fatal
+    const { api, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: JSON.stringify({
+        type: "excalidraw",
+        elements: [API.createElement({ type: "rectangle", id: "A" })],
+        appState: {
+          gridSize: 20,
+          viewBackgroundColor: "#eeeeee",
+          collaborators: [], // a Map in live state; an array would throw
+          viewModeEnabled: true,
+          errorMessage: "injected",
+          openDialog: { name: "settings" },
+        },
+      }),
+    });
+    expect(api.setToast).not.toHaveBeenCalled();
+    expect(bridge.isLoaded()).toBe(true);
+
+    const { appState } = api.updateScene.mock.calls[0][0];
+    expect(appState.gridSize).toBe(20);
+    expect(appState.viewBackgroundColor).toBe("#eeeeee");
+    expect(appState.collaborators).toBeInstanceOf(Map);
+    expect(appState.viewModeEnabled).toBe(false);
+    expect(appState.errorMessage).toBeNull();
+    expect(appState.openDialog).toBeNull();
+    bridge.destroy();
+  });
+
+  it("ignores wrongly typed values for the two loadable keys", () => {
+    const { api, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: JSON.stringify({
+        elements: [],
+        appState: { gridSize: "20", viewBackgroundColor: 123 },
+      }),
+    });
+    const { appState } = api.updateScene.mock.calls[0][0];
+    // both fall through to the live values rather than being installed
+    expect(appState.gridSize).toBe(liveAppState().gridSize);
+    expect(appState.viewBackgroundColor).toBe(
+      liveAppState().viewBackgroundColor,
+    );
+    bridge.destroy();
+  });
+
   it("ignores a load from another window on the allowlisted origin", () => {
     const { api, parent, bridge } = setup();
     dispatchMessage(

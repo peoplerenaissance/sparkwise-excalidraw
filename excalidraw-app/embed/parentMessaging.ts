@@ -109,6 +109,31 @@ export const isParentOwnedScene = (): boolean =>
 
 type LoadableScene = Pick<ImportedDataState, "elements" | "appState" | "files">;
 
+/**
+ * The only appState a scene document may set. These are the two keys that
+ * survive an export round-trip, so they are the only ones a document written
+ * by this app can legitimately carry.
+ *
+ * Everything else is dropped rather than rejected. `restoreAppState` prefers a
+ * supplied value over both the local one and the default, so an unrecognised
+ * key would be installed verbatim into live editor state — `collaborators` is
+ * a `Map` there, and a stored `[]` would throw on the next render. Scenes reach
+ * us from agents, hand-editing, template clones and old revisions, so an
+ * unexpected key is a thing to ignore, not a reason to refuse the board.
+ */
+const pickLoadableAppState = (
+  appState: unknown,
+): LoadableScene["appState"] | undefined => {
+  if (!appState || typeof appState !== "object") {
+    return undefined;
+  }
+  const { gridSize, viewBackgroundColor } = appState as Record<string, unknown>;
+  return {
+    ...(typeof gridSize === "number" || gridSize === null ? { gridSize } : {}),
+    ...(typeof viewBackgroundColor === "string" ? { viewBackgroundColor } : {}),
+  };
+};
+
 /** Accepts a full scene doc (serializeAsJSON output) or a bare element array. Throws on anything else. */
 export const parseEmbeddedScene = (scene: string): LoadableScene => {
   if (!scene.trim()) {
@@ -124,7 +149,7 @@ export const parseEmbeddedScene = (scene: string): LoadableScene => {
     Array.isArray((parsed as { elements?: unknown }).elements)
   ) {
     const { elements, appState, files } = parsed as LoadableScene;
-    return { elements, appState, files };
+    return { elements, appState: pickLoadableAppState(appState), files };
   }
   throw new Error("Scene must be a scene document or an element array");
 };
@@ -228,10 +253,13 @@ export const createEmbedBridge = ({
       // believes `nextGen` is installed and silently discards every save the
       // editor goes on to send under the older generation.
       post({ type: EMBED_MESSAGE_TYPES.ERROR, gen: nextGen, message });
+      // The parent owns the durable "this board could not load" UI; this is
+      // only so the author is not left staring at an unexplained old scene.
+      // It auto-dismisses: a permanent toast in a short drawer reads as the
+      // board itself being broken.
       api.setToast({
         message: `Could not load the whiteboard scene: ${message}`,
         closable: true,
-        duration: Infinity,
       });
       return;
     }
