@@ -97,6 +97,11 @@ import Trans from "../packages/excalidraw/components/Trans";
 import { ShareDialog, shareDialogStateAtom } from "./share/ShareDialog";
 import { usePostHog } from "posthog-js/react";
 import { loadFilesFromHttpStorage, TokenService } from "./data/httpStorage";
+import {
+  createEmbedBridge,
+  getParentOrigin,
+  isParentOwnedScene,
+} from "./embed/parentMessaging";
 
 polyfill();
 
@@ -149,6 +154,13 @@ const initializeScene = async (opts: {
     /^#json=([a-zA-Z0-9_-]+),([a-zA-Z0-9_-]+)$/,
   );
   const externalUrlMatch = window.location.hash.match(/^#url=(.*)$/);
+
+  // Embedded by a parent application that owns the scene and sends it via
+  // `excalidraw:load`. Never restore the browser-local scene here, or it
+  // would be echoed back to the parent and overwrite the stored one.
+  if (isParentOwnedScene()) {
+    return { scene: null, isExternalScene: false };
+  }
 
   const localDataState = importFromLocalStorage();
 
@@ -304,6 +316,10 @@ const ExcalidrawWrapper = () => {
   const [excalidrawAPI, excalidrawRefCallback] =
     useCallbackRefState<ExcalidrawImperativeAPI>();
 
+  const embedBridgeRef = useRef<ReturnType<typeof createEmbedBridge> | null>(
+    null,
+  );
+
   const [, setShareDialogState] = useAtom(shareDialogStateAtom);
   const [collabAPI] = useAtom(collabAPIAtom);
   const [isCollaborating] = useAtomWithInitialValue(isCollaboratingAtom, () => {
@@ -389,9 +405,22 @@ const ExcalidrawWrapper = () => {
       }
     };
 
+    const parentOrigin = isParentOwnedScene() ? getParentOrigin() : null;
+    if (parentOrigin) {
+      // never write the embedded session's scene into this browser's local
+      // browser-local scene
+      LocalData.pauseSave("embed");
+      embedBridgeRef.current = createEmbedBridge({
+        api: excalidrawAPI,
+        parentOrigin,
+        parentWindow: window.parent,
+      });
+    }
+
     initializeScene({ collabAPI, excalidrawAPI }).then(async (data) => {
       loadImages(data, /* isInitialLoad */ true);
       initialStatePromiseRef.current.promise.resolve(data.scene);
+      embedBridgeRef.current?.start();
     });
 
     const onHashChange = async (event: HashChangeEvent) => {
@@ -425,7 +454,7 @@ const ExcalidrawWrapper = () => {
     );
 
     const syncData = debounce(() => {
-      if (isTestEnv()) {
+      if (isTestEnv() || embedBridgeRef.current) {
         return;
       }
       if (
@@ -484,6 +513,7 @@ const ExcalidrawWrapper = () => {
 
     const onUnload = () => {
       LocalData.flushSave();
+      embedBridgeRef.current?.flush();
     };
 
     const visibilityChange = (event: FocusEvent | Event) => {
@@ -504,6 +534,9 @@ const ExcalidrawWrapper = () => {
     document.addEventListener(EVENT.VISIBILITY_CHANGE, visibilityChange, false);
     window.addEventListener(EVENT.FOCUS, visibilityChange, false);
     return () => {
+      embedBridgeRef.current?.destroy();
+      embedBridgeRef.current = null;
+      LocalData.resumeSave("embed");
       window.removeEventListener(EVENT.HASHCHANGE, onHashChange, false);
       window.removeEventListener(EVENT.UNLOAD, onUnload, false);
       window.removeEventListener(EVENT.BLUR, visibilityChange, false);
@@ -567,6 +600,8 @@ const ExcalidrawWrapper = () => {
     }
 
     setTheme(appState.theme);
+
+    embedBridgeRef.current?.onChange(elements, appState, files);
 
     // this check is redundant, but since this is a hot path, it's best
     // not to evaludate the nested expression every time

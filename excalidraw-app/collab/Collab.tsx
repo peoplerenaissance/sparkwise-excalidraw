@@ -84,6 +84,7 @@ import { Mutable, ValueOf } from "../../packages/excalidraw/utility-types";
 import { getVisibleSceneBounds } from "../../packages/excalidraw/element/bounds";
 import { withBatchedUpdates } from "../../packages/excalidraw/reactUtils";
 import * as Sentry from "@sentry/browser";
+import { isAllowedParentOrigin } from "../embed/parentMessaging";
 
 export const collabAPIAtom = atom<CollabAPI | null>(null);
 export const isCollaboratingAtom = atom(false);
@@ -131,12 +132,6 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   private socketInitializationTimer?: number;
   private lastBroadcastedOrReceivedSceneVersion: number = -1;
   private collaborators = new Map<SocketId, Collaborator>();
-  private parentAllowedOrigins = (
-    import.meta.env.VITE_APP_TOKEN_SERVICE_ALLOWED_ORIGINS || ""
-  )
-    .split(",")
-    .map((origin: string) => origin.trim())
-    .filter(Boolean);
   private inFlightSave: Promise<unknown> = Promise.resolve();
 
   constructor(props: CollabProps) {
@@ -247,7 +242,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
 
   private handleParentMessage = async (event: MessageEvent) => {
     if (
-      !this.parentAllowedOrigins.includes(event.origin) ||
+      !isAllowedParentOrigin(event.origin) ||
       event.data?.type !== "FLUSH_SAVE"
     ) {
       return;
