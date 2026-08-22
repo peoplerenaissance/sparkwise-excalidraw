@@ -22,7 +22,7 @@ import { LocalData } from "../data/LocalData";
 
 const { h } = window;
 
-const PARENT_ORIGIN = "https://architect.test";
+const PARENT_ORIGIN = "https://parent.test";
 const OTHER_ORIGIN = "https://evil.test";
 
 Object.defineProperty(window, "crypto", {
@@ -92,7 +92,7 @@ const sceneDoc = (extra: Partial<Record<string, unknown>> = {}) =>
   JSON.stringify({
     type: "excalidraw",
     version: 2,
-    source: "https://architect.test",
+    source: "https://parent.test",
     elements: [
       API.createElement({ type: "rectangle", id: "A" }),
       API.createElement({ type: "ellipse", id: "B" }),
