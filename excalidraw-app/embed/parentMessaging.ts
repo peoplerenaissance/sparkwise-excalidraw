@@ -21,6 +21,11 @@ import { debounce } from "../../packages/excalidraw/utils";
  *               gen?: number }                             debounced; `gen`
  *                                                          echoes the load it
  *                                                          descends from
+ *   parent <- { type: "excalidraw:error",                 a load did not land;
+ *               gen?: number, message: string }            the scene and the
+ *                                                          generation it
+ *                                                          descends from are
+ *                                                          unchanged
  *
  * Invariant: a `save` is never posted before a `load` succeeded. The parent
  * persists whatever it receives, so echoing a blank/local scene would wipe
@@ -30,6 +35,7 @@ export const EMBED_MESSAGE_TYPES = {
   READY: "excalidraw:ready",
   LOAD: "excalidraw:load",
   SAVE: "excalidraw:save",
+  ERROR: "excalidraw:error",
 } as const;
 
 export const EMBED_SAVE_DEBOUNCE_MS = 500;
@@ -135,7 +141,12 @@ export const createEmbedBridge = ({
   // every save so the parent can drop a save that crossed a newer load.
   let gen: number | undefined;
 
-  const post = (message: { type: string; scene?: string; gen?: number }) => {
+  const post = (message: {
+    type: string;
+    scene?: string;
+    gen?: number;
+    message?: string;
+  }) => {
     parentWindow.postMessage(message, parentOrigin);
   };
 
@@ -167,42 +178,55 @@ export const createEmbedBridge = ({
     ) {
       return;
     }
-    // A load supersedes anything the author drew before it arrived: drop a
-    // pending debounced save so it cannot fire afterwards and hand the parent
-    // the pre-load scene on top of the one it just sent.
-    save.cancel();
-    gen = typeof event.data.gen === "number" ? event.data.gen : undefined;
+    const nextGen =
+      typeof event.data.gen === "number" ? event.data.gen : undefined;
+
+    // Parse and restore before touching any bridge state, so a payload that
+    // throws leaves the scene, the generation it descends from, and any armed
+    // save exactly as they were.
+    let restored: ReturnType<typeof restore>;
     try {
-      const parsed = parseEmbeddedScene(event.data.scene);
-      const restored = restore(parsed, null, null, { repairBindings: true });
-      api.updateScene({
-        elements: restored.elements,
-        appState: restored.appState,
-        commitToHistory: true,
+      restored = restore(parseEmbeddedScene(event.data.scene), null, null, {
+        repairBindings: true,
       });
-      const files = Object.values(restored.files);
-      if (files.length) {
-        api.addFiles(files);
-      }
-      // Remember the loaded scene in the same form a save would take so the
-      // onChange Excalidraw fires for this very update is not echoed back.
-      lastScene = serializeAsJSON(
-        restored.elements,
-        restored.appState,
-        restored.files,
-        "local",
-      );
-      loaded = true;
     } catch (error: any) {
+      const message = error?.message || "invalid scene";
       console.error("[draw][embed] failed to load scene from parent", error);
+      // The parent has to hear that this load did not land. Otherwise it
+      // believes `nextGen` is installed and silently discards every save the
+      // editor goes on to send under the older generation.
+      post({ type: EMBED_MESSAGE_TYPES.ERROR, gen: nextGen, message });
       api.setToast({
-        message: `Could not load the whiteboard scene: ${
-          error?.message || "invalid scene"
-        }`,
+        message: `Could not load the whiteboard scene: ${message}`,
         closable: true,
         duration: Infinity,
       });
+      return;
     }
+
+    // The load supersedes anything the author drew before it arrived: drop a
+    // pending debounced save so it cannot fire afterwards and hand the parent
+    // the pre-load scene on top of the one it just sent.
+    save.cancel();
+    gen = nextGen;
+    api.updateScene({
+      elements: restored.elements,
+      appState: restored.appState,
+      commitToHistory: true,
+    });
+    const files = Object.values(restored.files);
+    if (files.length) {
+      api.addFiles(files);
+    }
+    // Remember the loaded scene in the same form a save would take so the
+    // onChange Excalidraw fires for this very update is not echoed back.
+    lastScene = serializeAsJSON(
+      restored.elements,
+      restored.appState,
+      restored.files,
+      "local",
+    );
+    loaded = true;
   };
 
   return {

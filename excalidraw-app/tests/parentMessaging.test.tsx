@@ -379,6 +379,64 @@ describe("embed bridge", () => {
     bridge.destroy();
   });
 
+  it("a failed load keeps the previous generation and tells the parent it did not land", () => {
+    // The parent drops saves whose `gen` is older than the load it believes is
+    // installed. If a failed load still advanced `gen`, every later save would
+    // claim a generation it never reached; if the parent were never told, it
+    // would silently discard saves under the older one instead.
+    const { api, parent, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: sceneDoc(),
+      gen: 8,
+    });
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: "{corrupt",
+      gen: 9,
+    });
+    const errors = parent.postMessage.mock.calls.filter(
+      ([msg]) => msg.type === EMBED_MESSAGE_TYPES.ERROR,
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0][0].gen).toBe(9);
+    expect(errors[0][1]).toBe(PARENT_ORIGIN);
+    expect(api.setToast).toHaveBeenCalledTimes(1);
+    // the scene on screen is untouched by the failed load
+    expect(api.updateScene).toHaveBeenCalledTimes(1);
+
+    change(bridge, ["A"]);
+    vi.advanceTimersByTime(5000);
+    const saves = savesPosted(parent);
+    expect(saves).toHaveLength(1);
+    expect(saves[0][0].gen).toBe(8);
+    bridge.destroy();
+  });
+
+  it("a failed load leaves a pending save armed so pre-load edits are not lost", () => {
+    const { parent, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: sceneDoc(),
+      gen: 1,
+    });
+    change(bridge, ["DRAWN"]);
+    vi.advanceTimersByTime(100); // debounce still pending
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: "{not json",
+      gen: 2,
+    });
+    vi.advanceTimersByTime(5000);
+    const saves = savesPosted(parent);
+    expect(saves).toHaveLength(1);
+    expect(
+      JSON.parse(saves[0][0].scene).elements.map((el: { id: string }) => el.id),
+    ).toEqual(["DRAWN"]);
+    expect(saves[0][0].gen).toBe(1);
+    bridge.destroy();
+  });
+
   it("echoes the load's generation id on every save so the parent can drop stale ones", () => {
     const { parent, bridge } = setup();
     dispatchMessage(PARENT_ORIGIN, {
