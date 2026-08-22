@@ -14,6 +14,7 @@ import {
   isAllowedParentOrigin,
   isEmbedded,
   isParentOwnedScene,
+  PARENT_ORIGIN_PARAM,
 } from "../embed/parentMessaging";
 import { STORAGE_KEYS } from "../app_constants";
 import ExcalidrawApp from "../App";
@@ -60,11 +61,15 @@ vi.mock("socket.io-client", () => {
   };
 });
 
-const setReferrer = (referrer: string) => {
-  Object.defineProperty(document, "referrer", {
-    value: referrer,
-    configurable: true,
-  });
+const setSearch = (search: string) => {
+  window.history.replaceState({}, "", search);
+};
+
+const embedUrl = (origin: string, extra = "") =>
+  `/?${PARENT_ORIGIN_PARAM}=${encodeURIComponent(origin)}${extra}`;
+
+const setParentOriginParam = (origin: string) => {
+  setSearch(embedUrl(origin));
 };
 
 const setParentWindow = (parent: Window) => {
@@ -103,14 +108,21 @@ const dispatchMessage = (origin: string, data: unknown) => {
 
 beforeEach(() => {
   vi.stubEnv("VITE_APP_TOKEN_SERVICE_ALLOWED_ORIGINS", PARENT_ORIGIN);
-  setReferrer("");
+  setSearch("/");
+  window.location.hash = "";
   setParentWindow(realParent);
   localStorage.clear();
 });
 
+// activation now lives in the URL, so a test that fails partway through must
+// still hand the next one a clean location and parent window
 afterEach(() => {
+  setSearch("/");
+  window.location.hash = "";
+  setParentWindow(realParent);
   vi.unstubAllEnvs();
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("parent origin allowlist", () => {
@@ -127,37 +139,61 @@ describe("parent origin allowlist", () => {
     expect(isAllowedParentOrigin(OTHER_ORIGIN)).toBe(false);
   });
 
-  it("derives the parent origin from the referrer only when allowlisted", () => {
-    setReferrer(`${PARENT_ORIGIN}/resources/123`);
+  it("takes the parent origin from the URL param only when allowlisted", () => {
+    setParentOriginParam(PARENT_ORIGIN);
     expect(getParentOrigin()).toBe(PARENT_ORIGIN);
-    setReferrer(`${OTHER_ORIGIN}/resources/123`);
+    setParentOriginParam(OTHER_ORIGIN);
     expect(getParentOrigin()).toBeNull();
-    setReferrer("not a url");
+    setSearch(`/?${PARENT_ORIGIN_PARAM}=not%20a%20url`);
+    expect(getParentOrigin()).toBeNull();
+    setSearch("/");
     expect(getParentOrigin()).toBeNull();
   });
 
+  it("does not fall back to the referrer when the param is absent", () => {
+    // a Referrer-Policy on the embedder blanks `document.referrer` out, so
+    // inferring the origin from it turned the protocol off silently
+    Object.defineProperty(document, "referrer", {
+      value: `${PARENT_ORIGIN}/resources/123`,
+      configurable: true,
+    });
+    setParentWindow({} as Window);
+    setSearch("/");
+    expect(getParentOrigin()).toBeNull();
+    expect(isEmbedded()).toBe(false);
+    expect(isParentOwnedScene()).toBe(false);
+  });
+
   it("is embedded only when framed by an allowlisted parent", () => {
-    setReferrer(`${PARENT_ORIGIN}/x`);
+    setParentOriginParam(PARENT_ORIGIN);
     expect(isEmbedded()).toBe(false); // window.parent === window
     setParentWindow({} as Window);
     expect(isEmbedded()).toBe(true);
-    setReferrer(`${OTHER_ORIGIN}/x`);
+    setParentOriginParam(OTHER_ORIGIN);
     expect(isEmbedded()).toBe(false);
   });
 
   it("a collab/shared link is not a parent-owned scene even when embedded", () => {
-    setReferrer(`${PARENT_ORIGIN}/x`);
+    setParentOriginParam(PARENT_ORIGIN);
     setParentWindow({} as Window);
     expect(isParentOwnedScene()).toBe(true);
     window.location.hash = "#room=abc,def";
     expect(isEmbedded()).toBe(true);
     expect(isParentOwnedScene()).toBe(false);
     window.location.hash = "";
-    window.history.replaceState({}, "", "/?id=xyz");
+    setSearch(embedUrl(PARENT_ORIGIN, "&id=xyz"));
     expect(isParentOwnedScene()).toBe(false);
-    window.history.replaceState({}, "", "/?mode=full");
-    expect(isParentOwnedScene()).toBe(true);
-    window.history.replaceState({}, "", "/");
+  });
+
+  it("activation is independent of the UI mode", () => {
+    setParentWindow({} as Window);
+    for (const mode of ["none", "minimal", "full", "all"]) {
+      setSearch(embedUrl(PARENT_ORIGIN, `&mode=${mode}`));
+      expect(isParentOwnedScene()).toBe(true);
+    }
+    // ...and no mode turns it on without the param
+    setSearch("/?mode=full");
+    expect(isParentOwnedScene()).toBe(false);
   });
 });
 
@@ -482,7 +518,7 @@ describe("ExcalidrawApp embedded mode", () => {
   it("posts ready once and round-trips a load through the real app", async () => {
     const parent = { postMessage: vi.fn() };
     setParentWindow(parent as unknown as Window);
-    setReferrer(`${PARENT_ORIGIN}/resources/abc`);
+    setParentOriginParam(PARENT_ORIGIN);
     // a stale local scene must NOT be restored while embedded (KTD2)
     localStorage.setItem(
       STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS,
@@ -522,7 +558,9 @@ describe("ExcalidrawApp embedded mode", () => {
 
   it("not embedded: restores localStorage and posts nothing", async () => {
     const parent = { postMessage: vi.fn() };
-    setReferrer(`${PARENT_ORIGIN}/resources/abc`);
+    // framed by the same parent, but with no `parentOrigin` in the URL
+    setParentWindow(parent as unknown as Window);
+    setSearch("/");
     const localElements = [API.createElement({ type: "rectangle", id: "L1" })];
     localStorage.setItem(
       STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS,
@@ -534,6 +572,10 @@ describe("ExcalidrawApp embedded mode", () => {
     await waitFor(() => {
       expect(h.elements.map((el) => el.id)).toEqual(["L1"]);
     });
-    expect(parent.postMessage).not.toHaveBeenCalled();
+    expect(
+      parent.postMessage.mock.calls.filter(([msg]) =>
+        String(msg?.type ?? "").startsWith("excalidraw:"),
+      ),
+    ).toHaveLength(0);
   });
 });

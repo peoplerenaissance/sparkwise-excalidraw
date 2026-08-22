@@ -52,14 +52,31 @@ export const getAllowedParentOrigins = (): string[] =>
 export const isAllowedParentOrigin = (origin: string): boolean =>
   getAllowedParentOrigins().includes(origin);
 
-/** The embedding parent's origin, derived from the referrer; null unless allowlisted. */
+/** URL param by which an embedding parent names its own origin. */
+export const PARENT_ORIGIN_PARAM = "parentOrigin";
+
+/**
+ * The embedding parent's origin, named by `?parentOrigin=`; null unless it
+ * parses to an origin on the allowlist.
+ *
+ * The parent states its origin rather than us inferring it from
+ * `document.referrer`, which a `Referrer-Policy` on the parent document (or a
+ * `referrerpolicy` on the iframe) blanks out. Inferring it meant a policy
+ * change on the embedder's side silently turned the protocol off and dropped
+ * the frame back to browser-local behaviour, with nothing logged or thrown.
+ * The param is untrusted input and earns nothing by being present: it only
+ * selects which allowlisted origin we will talk to.
+ */
 export const getParentOrigin = (): string | null => {
-  if (!document.referrer) {
+  const param = new URLSearchParams(window.location.search).get(
+    PARENT_ORIGIN_PARAM,
+  );
+  if (!param) {
     return null;
   }
   let origin: string;
   try {
-    origin = new URL(document.referrer).origin;
+    origin = new URL(param).origin;
   } catch {
     return null;
   }
@@ -71,9 +88,10 @@ export const isEmbedded = (): boolean =>
 
 /**
  * True when an allowlisted parent embeds us to own the scene over
- * postMessage (`?mode=full`, no hash). An embedded `#room=`/`#json=`/
- * `#url=`/`?id=` link is still a collab/shared scene and keeps its normal
- * initialization, including `FLUSH_SAVE`.
+ * postMessage. `?parentOrigin=` is the activation signal and is independent of
+ * the UI mode. An embedded `#room=`/`#json=`/`#url=`/`?id=` link is still a
+ * collab/shared scene and keeps its normal initialization, including
+ * `FLUSH_SAVE`.
  */
 export const isParentOwnedScene = (): boolean =>
   isEmbedded() &&
