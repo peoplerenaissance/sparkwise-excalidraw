@@ -49,11 +49,21 @@ export const EMBED_SAVE_DEBOUNCE_MS = 500;
 // Origin allowlist (shared with Collab FLUSH_SAVE and the token service)
 // ---------------------------------------------------------------------------
 
-export const getAllowedParentOrigins = (): string[] =>
-  (import.meta.env.VITE_APP_TOKEN_SERVICE_ALLOWED_ORIGINS || "")
-    .split(",")
-    .map((origin: string) => origin.trim())
-    .filter(Boolean);
+let cachedRawAllowlist: string | undefined;
+let cachedAllowedOrigins: string[] = [];
+
+/** Parsed `VITE_APP_TOKEN_SERVICE_ALLOWED_ORIGINS`. Called per inbound window message, so it caches. */
+export const getAllowedParentOrigins = (): string[] => {
+  const raw = import.meta.env.VITE_APP_TOKEN_SERVICE_ALLOWED_ORIGINS || "";
+  if (raw !== cachedRawAllowlist) {
+    cachedRawAllowlist = raw;
+    cachedAllowedOrigins = raw
+      .split(",")
+      .map((origin: string) => origin.trim())
+      .filter(Boolean);
+  }
+  return cachedAllowedOrigins;
+};
 
 export const isAllowedParentOrigin = (origin: string): boolean =>
   getAllowedParentOrigins().includes(origin);

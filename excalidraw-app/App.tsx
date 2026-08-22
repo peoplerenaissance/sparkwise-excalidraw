@@ -454,7 +454,9 @@ const ExcalidrawWrapper = () => {
     );
 
     const syncData = debounce(() => {
-      if (isTestEnv() || embedBridgeRef.current) {
+      // `pauseSave` is the canonical "this session must not touch browser-local
+      // state" lock; the embed holds it, as collaboration does
+      if (isTestEnv() || LocalData.isSavePaused()) {
         return;
       }
       if (
