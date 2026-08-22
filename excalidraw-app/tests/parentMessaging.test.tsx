@@ -102,8 +102,15 @@ const sceneDoc = (extra: Partial<Record<string, unknown>> = {}) =>
     ...extra,
   });
 
-const dispatchMessage = (origin: string, data: unknown) => {
-  window.dispatchEvent(new MessageEvent("message", { origin, data }));
+const dispatchMessage = (
+  origin: string,
+  data: unknown,
+  source: unknown = window.parent,
+) => {
+  const event = new MessageEvent("message", { origin, data });
+  // MessageEventInit only accepts a real window, so stamp the sender on after
+  Object.defineProperty(event, "source", { value: source });
+  window.dispatchEvent(event);
 };
 
 beforeEach(() => {
@@ -200,23 +207,45 @@ describe("parent origin allowlist", () => {
 describe("embed bridge", () => {
   type FakeAPI = Pick<
     ExcalidrawImperativeAPI,
-    "updateScene" | "addFiles" | "setToast"
+    "updateScene" | "addFiles" | "setToast" | "getAppState"
   >;
 
-  const setup = () => {
+  const liveAppState = () =>
+    ({
+      ...getDefaultAppState(),
+      // a camera the author panned to, and the learner-mode frame settings the
+      // library installs at init — neither survives an export round-trip
+      scrollX: -1200,
+      scrollY: -800,
+      zoom: { value: 2 as AppState["zoom"]["value"] },
+      theme: "dark",
+      frameRendering: {
+        enabled: false,
+        clip: false,
+        name: false,
+        outline: false,
+      },
+    } as AppState);
+
+  const setup = ({ start = true }: { start?: boolean } = {}) => {
     vi.useFakeTimers();
     const api = {
       updateScene: vi.fn(),
       addFiles: vi.fn(),
       setToast: vi.fn(),
+      getAppState: vi.fn(liveAppState),
     };
     const parent = { postMessage: vi.fn() };
+    // the bridge only accepts messages whose sender is its parent window
+    setParentWindow(parent as unknown as Window);
     const bridge = createEmbedBridge({
       api: api as unknown as FakeAPI as ExcalidrawImperativeAPI,
       parentOrigin: PARENT_ORIGIN,
       parentWindow: parent as unknown as Window,
     });
-    bridge.start();
+    if (start) {
+      bridge.start();
+    }
     return { api, parent, bridge };
   };
 
@@ -498,6 +527,83 @@ describe("embed bridge", () => {
     change(bridge, ["FIRST"]);
     vi.advanceTimersByTime(5000);
     expect(savesPosted(parent)).toHaveLength(1);
+    bridge.destroy();
+  });
+
+  it("a load preserves camera, theme and frame rendering the scene cannot carry", () => {
+    // only gridSize and viewBackgroundColor survive an export round-trip, so
+    // everything else must fall back to the live state rather than to defaults
+    const { api, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: sceneDoc(),
+    });
+    const { appState } = api.updateScene.mock.calls[0][0];
+    expect(appState.scrollX).toBe(-1200);
+    expect(appState.scrollY).toBe(-800);
+    expect(appState.zoom.value).toBe(2);
+    expect(appState.theme).toBe("dark");
+    expect(appState.frameRendering).toEqual({
+      enabled: false,
+      clip: false,
+      name: false,
+      outline: false,
+    });
+    // ...while what the scene does carry still wins
+    expect(appState.viewBackgroundColor).toBe("#ffffff");
+    bridge.destroy();
+  });
+
+  it("ignores a load from another window on the allowlisted origin", () => {
+    const { api, parent, bridge } = setup();
+    dispatchMessage(
+      PARENT_ORIGIN,
+      { type: EMBED_MESSAGE_TYPES.LOAD, scene: sceneDoc() },
+      { postMessage: vi.fn() }, // a sibling frame, right origin, wrong window
+    );
+    expect(api.updateScene).not.toHaveBeenCalled();
+    change(bridge, ["A"]);
+    vi.advanceTimersByTime(5000);
+    expect(savesPosted(parent)).toHaveLength(0);
+    bridge.destroy();
+  });
+
+  it("applies a load that arrived before start() instead of dropping it", () => {
+    // a parent may post its scene on the frame's load event rather than
+    // waiting for ready, and has no reason to send it twice
+    const { api, parent, bridge } = setup({ start: false });
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: sceneDoc(),
+      gen: 3,
+    });
+    expect(api.updateScene).not.toHaveBeenCalled();
+
+    bridge.start();
+    expect(api.updateScene).toHaveBeenCalledTimes(1);
+    expect(
+      api.updateScene.mock.calls[0][0].elements.map(
+        (el: { id: string }) => el.id,
+      ),
+    ).toEqual(["A", "B"]);
+    expect(bridge.isLoaded()).toBe(true);
+
+    change(bridge, ["A"]);
+    vi.advanceTimersByTime(5000);
+    expect(savesPosted(parent)[0][0].gen).toBe(3);
+    bridge.destroy();
+  });
+
+  it("start() is idempotent", () => {
+    const { api, parent, bridge } = setup();
+    bridge.start();
+    bridge.start();
+    expect(
+      parent.postMessage.mock.calls.filter(
+        ([msg]) => msg.type === EMBED_MESSAGE_TYPES.READY,
+      ),
+    ).toHaveLength(1);
+    expect(api.updateScene).not.toHaveBeenCalled();
     bridge.destroy();
   });
 

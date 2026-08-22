@@ -127,7 +127,11 @@ export const parseEmbeddedScene = (scene: string): LoadableScene => {
 // ---------------------------------------------------------------------------
 
 export type EmbedBridge = {
-  /** Registers the message listener and posts `ready`. */
+  /**
+   * Posts `ready`, applying first any load that arrived before the editor
+   * finished initializing. The message listener itself is registered at
+   * construction. Calling this more than once does nothing.
+   */
   start: () => void;
   /** Wire into Excalidraw's `onChange`; no-op until a load succeeded. */
   onChange: (
@@ -152,9 +156,16 @@ export const createEmbedBridge = ({
   parentWindow: Window;
   debounceMs?: number;
 }): EmbedBridge => {
+  type PendingLoad = { scene: string; gen: number | undefined };
+
   let loaded = false;
+  let started = false;
   let destroyed = false;
   let lastScene: string | null = null;
+  // A load that arrives before `start()` is held rather than dropped. The
+  // parent may post its scene as soon as the frame loads rather than waiting
+  // for `ready`, and it has no reason to send it a second time.
+  let pendingLoad: PendingLoad | null = null;
   // Generation id of the load the current scene descends from; echoed on
   // every save so the parent can drop a save that crossed a newer load.
   let gen: number | undefined;
@@ -187,24 +198,20 @@ export const createEmbedBridge = ({
     debounceMs,
   );
 
-  const handleMessage = (event: MessageEvent) => {
-    if (
-      destroyed ||
-      event.origin !== parentOrigin ||
-      event.data?.type !== EMBED_MESSAGE_TYPES.LOAD ||
-      typeof event.data.scene !== "string"
-    ) {
-      return;
-    }
-    const nextGen =
-      typeof event.data.gen === "number" ? event.data.gen : undefined;
+  const applyLoad = ({ scene, gen: nextGen }: PendingLoad) => {
+    const live = api.getAppState();
 
     // Parse and restore before touching any bridge state, so a payload that
     // throws leaves the scene, the generation it descends from, and any armed
     // save exactly as they were.
     let restored: ReturnType<typeof restore>;
     try {
-      restored = restore(parseEmbeddedScene(event.data.scene), null, null, {
+      // Restore against the live appState. Only `gridSize` and
+      // `viewBackgroundColor` survive an export round-trip, so every other key
+      // is absent from the parent's document; with no local state to fall back
+      // on, `restore` fills defaults and the load would reset the camera,
+      // re-enable frame rendering, and force the light theme.
+      restored = restore(parseEmbeddedScene(scene), live, null, {
         repairBindings: true,
       });
     } catch (error: any) {
@@ -227,9 +234,13 @@ export const createEmbedBridge = ({
     // the pre-load scene on top of the one it just sent.
     save.cancel();
     gen = nextGen;
+    // `restoreAppState` special-cases zoom and falls back to the default
+    // rather than to the local state, so carry the live value across by hand.
+    // A scene document can never supply one: zoom is not an exported key.
+    const nextAppState = { ...restored.appState, zoom: live.zoom };
     api.updateScene({
       elements: restored.elements,
-      appState: restored.appState,
+      appState: nextAppState,
       commitToHistory: true,
     });
     const files = Object.values(restored.files);
@@ -240,16 +251,49 @@ export const createEmbedBridge = ({
     // onChange Excalidraw fires for this very update is not echoed back.
     lastScene = serializeAsJSON(
       restored.elements,
-      restored.appState,
+      nextAppState,
       restored.files,
       "local",
     );
     loaded = true;
   };
 
+  const handleMessage = (event: MessageEvent) => {
+    if (
+      destroyed ||
+      // origin equality alone does not identify a sender: any window on an
+      // allowlisted origin can reach this frame
+      event.source !== parentWindow ||
+      event.origin !== parentOrigin ||
+      event.data?.type !== EMBED_MESSAGE_TYPES.LOAD ||
+      typeof event.data.scene !== "string"
+    ) {
+      return;
+    }
+    const load: PendingLoad = {
+      scene: event.data.scene,
+      gen: typeof event.data.gen === "number" ? event.data.gen : undefined,
+    };
+    if (!started) {
+      pendingLoad = load;
+      return;
+    }
+    applyLoad(load);
+  };
+
+  window.addEventListener("message", handleMessage);
+
   return {
     start: () => {
-      window.addEventListener("message", handleMessage);
+      if (started || destroyed) {
+        return;
+      }
+      started = true;
+      if (pendingLoad) {
+        const load = pendingLoad;
+        pendingLoad = null;
+        applyLoad(load);
+      }
       post({ type: EMBED_MESSAGE_TYPES.READY });
     },
     onChange: (elements, appState, files) => {
