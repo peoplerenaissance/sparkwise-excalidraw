@@ -519,6 +519,7 @@ const ExcalidrawWrapper = () => {
     const visibilityChange = (event: FocusEvent | Event) => {
       if (event.type === EVENT.BLUR || document.hidden) {
         LocalData.flushSave();
+        embedBridgeRef.current?.flush();
       }
       if (
         event.type === EVENT.VISIBILITY_CHANGE ||

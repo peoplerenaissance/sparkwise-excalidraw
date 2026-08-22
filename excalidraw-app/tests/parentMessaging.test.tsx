@@ -607,6 +607,72 @@ describe("embed bridge", () => {
     bridge.destroy();
   });
 
+  it("flush posts the pending save, then acks with the request id", () => {
+    const { parent, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: sceneDoc(),
+      gen: 4,
+    });
+    change(bridge, ["A"]);
+    vi.advanceTimersByTime(100); // debounce still pending
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.FLUSH,
+      requestId: "req-1",
+    });
+
+    const posted = parent.postMessage.mock.calls.map(([msg]) => msg);
+    const saveAt = posted.findIndex((m) => m.type === EMBED_MESSAGE_TYPES.SAVE);
+    const ackAt = posted.findIndex(
+      (m) => m.type === EMBED_MESSAGE_TYPES.FLUSHED,
+    );
+    expect(saveAt).toBeGreaterThanOrEqual(0);
+    // the ack must trail the save it covers, so awaiting it is sufficient
+    expect(ackAt).toBeGreaterThan(saveAt);
+    expect(posted[ackAt].requestId).toBe("req-1");
+    expect(posted[saveAt].gen).toBe(4);
+
+    // nothing left to fire afterwards
+    vi.advanceTimersByTime(5000);
+    expect(savesPosted(parent)).toHaveLength(1);
+    bridge.destroy();
+  });
+
+  it("flush acks even with nothing pending", () => {
+    const { parent, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: sceneDoc(),
+    });
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.FLUSH,
+      requestId: 7,
+    });
+    const acks = parent.postMessage.mock.calls.filter(
+      ([msg]) => msg.type === EMBED_MESSAGE_TYPES.FLUSHED,
+    );
+    expect(acks).toHaveLength(1);
+    expect(acks[0][0].requestId).toBe(7);
+    expect(savesPosted(parent)).toHaveLength(0);
+    bridge.destroy();
+  });
+
+  it("destroy posts a pending save rather than dropping it", () => {
+    const { parent, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: sceneDoc(),
+    });
+    change(bridge, ["LAST"]);
+    vi.advanceTimersByTime(100); // debounce still pending
+    bridge.destroy();
+    const saves = savesPosted(parent);
+    expect(saves).toHaveLength(1);
+    expect(
+      JSON.parse(saves[0][0].scene).elements.map((el: { id: string }) => el.id),
+    ).toEqual(["LAST"]);
+  });
+
   it("stops posting after destroy", () => {
     const { parent, bridge } = setup();
     dispatchMessage(PARENT_ORIGIN, {
@@ -617,6 +683,16 @@ describe("embed bridge", () => {
     change(bridge, ["A"]);
     vi.advanceTimersByTime(5000);
     expect(savesPosted(parent)).toHaveLength(0);
+    // a flush arriving after teardown is ignored, ack included
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.FLUSH,
+      requestId: "late",
+    });
+    expect(
+      parent.postMessage.mock.calls.filter(
+        ([msg]) => msg.type === EMBED_MESSAGE_TYPES.FLUSHED,
+      ),
+    ).toHaveLength(0);
   });
 });
 

@@ -26,6 +26,10 @@ import { debounce } from "../../packages/excalidraw/utils";
  *                                                          generation it
  *                                                          descends from are
  *                                                          unchanged
+ *   parent -> { type: "excalidraw:flush",                 post any pending save
+ *               requestId? }                               immediately
+ *   parent <- { type: "excalidraw:flushed",               ack, ordered behind
+ *               requestId? }                               the save it covers
  *
  * Invariant: a `save` is never posted before a `load` succeeded. The parent
  * persists whatever it receives, so echoing a blank/local scene would wipe
@@ -36,6 +40,8 @@ export const EMBED_MESSAGE_TYPES = {
   LOAD: "excalidraw:load",
   SAVE: "excalidraw:save",
   ERROR: "excalidraw:error",
+  FLUSH: "excalidraw:flush",
+  FLUSHED: "excalidraw:flushed",
 } as const;
 
 export const EMBED_SAVE_DEBOUNCE_MS = 500;
@@ -175,6 +181,7 @@ export const createEmbedBridge = ({
     scene?: string;
     gen?: number;
     message?: string;
+    requestId?: unknown;
   }) => {
     parentWindow.postMessage(message, parentOrigin);
   };
@@ -264,7 +271,24 @@ export const createEmbedBridge = ({
       // origin equality alone does not identify a sender: any window on an
       // allowlisted origin can reach this frame
       event.source !== parentWindow ||
-      event.origin !== parentOrigin ||
+      event.origin !== parentOrigin
+    ) {
+      return;
+    }
+
+    if (event.data?.type === EMBED_MESSAGE_TYPES.FLUSH) {
+      // Post whatever is pending, then acknowledge. Messages from one source
+      // are delivered in order, so the ack cannot overtake the save it covers
+      // and the parent need only wait for the ack before tearing us down.
+      save.flush();
+      post({
+        type: EMBED_MESSAGE_TYPES.FLUSHED,
+        requestId: event.data.requestId,
+      });
+      return;
+    }
+
+    if (
       event.data?.type !== EMBED_MESSAGE_TYPES.LOAD ||
       typeof event.data.scene !== "string"
     ) {
@@ -304,8 +328,12 @@ export const createEmbedBridge = ({
     },
     flush: () => save.flush(),
     destroy: () => {
+      // A parent that tears the frame down without the flush handshake still
+      // gets whatever was pending, on the occasions this cleanup runs at all.
+      // It is a backstop, not the mechanism: React cleanup does not reliably
+      // run when the frame is removed from the parent's DOM.
+      save.flush();
       destroyed = true;
-      save.cancel();
       window.removeEventListener("message", handleMessage);
     },
     isLoaded: () => loaded,
