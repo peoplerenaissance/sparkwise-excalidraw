@@ -14,10 +14,13 @@ import { debounce } from "../../packages/excalidraw/utils";
  * embedding parent window that owns the scene.
  *
  *   parent <- { type: "excalidraw:ready" }                 once, after init
- *   parent -> { type: "excalidraw:load", scene: string }   JSON scene doc or
- *                                                          bare element array
- *   parent <- { type: "excalidraw:save", scene: string }   serializeAsJSON(),
- *                                                          debounced
+ *   parent -> { type: "excalidraw:load", scene: string,   JSON scene doc, bare
+ *               gen?: number }                             element array, or ""
+ *                                                          for an empty board
+ *   parent <- { type: "excalidraw:save", scene: string,   serializeAsJSON(),
+ *               gen?: number }                             debounced; `gen`
+ *                                                          echoes the load it
+ *                                                          descends from
  *
  * Invariant: a `save` is never posted before a `load` succeeded. The parent
  * persists whatever it receives, so echoing a blank/local scene would wipe
@@ -78,6 +81,9 @@ type LoadableScene = Pick<ImportedDataState, "elements" | "appState" | "files">;
 
 /** Accepts a full scene doc (serializeAsJSON output) or a bare element array. Throws on anything else. */
 export const parseEmbeddedScene = (scene: string): LoadableScene => {
+  if (!scene.trim()) {
+    return { elements: [] };
+  }
   const parsed: unknown = JSON.parse(scene);
   if (Array.isArray(parsed)) {
     return { elements: parsed as ExcalidrawElement[] };
@@ -125,8 +131,11 @@ export const createEmbedBridge = ({
   let loaded = false;
   let destroyed = false;
   let lastScene: string | null = null;
+  // Generation id of the load the current scene descends from; echoed on
+  // every save so the parent can drop a save that crossed a newer load.
+  let gen: number | undefined;
 
-  const post = (message: { type: string; scene?: string }) => {
+  const post = (message: { type: string; scene?: string; gen?: number }) => {
     parentWindow.postMessage(message, parentOrigin);
   };
 
@@ -144,7 +153,7 @@ export const createEmbedBridge = ({
         return;
       }
       lastScene = scene;
-      post({ type: EMBED_MESSAGE_TYPES.SAVE, scene });
+      post({ type: EMBED_MESSAGE_TYPES.SAVE, scene, gen });
     },
     debounceMs,
   );
@@ -162,6 +171,7 @@ export const createEmbedBridge = ({
     // pending debounced save so it cannot fire afterwards and hand the parent
     // the pre-load scene on top of the one it just sent.
     save.cancel();
+    gen = typeof event.data.gen === "number" ? event.data.gen : undefined;
     try {
       const parsed = parseEmbeddedScene(event.data.scene);
       const restored = restore(parsed, null, null, { repairBindings: true });

@@ -379,6 +379,34 @@ describe("embed bridge", () => {
     bridge.destroy();
   });
 
+  it("echoes the load's generation id on every save so the parent can drop stale ones", () => {
+    const { parent, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: sceneDoc(),
+      gen: 7,
+    });
+    change(bridge, ["A"]);
+    vi.advanceTimersByTime(5000);
+    expect(savesPosted(parent)).toHaveLength(1);
+    expect(savesPosted(parent)[0][0].gen).toBe(7);
+    bridge.destroy();
+  });
+
+  it("treats a blank load as an empty scene (a new board must still be able to save)", () => {
+    const { api, parent, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: "",
+    });
+    expect(api.setToast).not.toHaveBeenCalled();
+    expect(bridge.isLoaded()).toBe(true);
+    change(bridge, ["FIRST"]);
+    vi.advanceTimersByTime(5000);
+    expect(savesPosted(parent)).toHaveLength(1);
+    bridge.destroy();
+  });
+
   it("stops posting after destroy", () => {
     const { parent, bridge } = setup();
     dispatchMessage(PARENT_ORIGIN, {
