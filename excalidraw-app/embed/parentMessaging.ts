@@ -83,6 +83,8 @@ export const PARENT_ORIGIN_PARAM = "parentOrigin";
  * The param is untrusted input and earns nothing by being present: it only
  * selects which allowlisted origin we will talk to.
  */
+let lastRejectedParam: string | null = null;
+
 export const getParentOrigin = (): string | null => {
   const param = new URLSearchParams(window.location.search).get(
     PARENT_ORIGIN_PARAM,
@@ -90,13 +92,27 @@ export const getParentOrigin = (): string | null => {
   if (!param) {
     return null;
   }
+  // Rejecting the param silently drops the session back to browser-local
+  // behaviour with nothing to show for it, which is the failure this param was
+  // introduced to remove. Say so once per distinct value.
+  const reject = (reason: string) => {
+    if (lastRejectedParam !== param) {
+      lastRejectedParam = param;
+      console.warn(
+        `[draw][embed] ignoring ?${PARENT_ORIGIN_PARAM}= (${reason}); the embed protocol stays off`,
+        param,
+        getAllowedParentOrigins(),
+      );
+    }
+    return null;
+  };
   let origin: string;
   try {
     origin = new URL(param).origin;
   } catch {
-    return null;
+    return reject("not a URL");
   }
-  return isAllowedParentOrigin(origin) ? origin : null;
+  return isAllowedParentOrigin(origin) ? origin : reject("not allowlisted");
 };
 
 export const isEmbedded = (): boolean =>
@@ -145,7 +161,10 @@ const pickLoadableAppState = (
 };
 
 /** Accepts a full scene doc (serializeAsJSON output) or a bare element array. Throws on anything else. */
-export const parseEmbeddedScene = (scene: string): LoadableScene => {
+export const parseEmbeddedScene = (scene: unknown): LoadableScene => {
+  if (typeof scene !== "string") {
+    throw new Error("Scene must be a string");
+  }
   if (!scene.trim()) {
     return { elements: [] };
   }
@@ -197,11 +216,17 @@ export const createEmbedBridge = ({
   parentWindow: Window;
   debounceMs?: number;
 }): EmbedBridge => {
-  type PendingLoad = { scene: string; gen: number | undefined };
+  type PendingLoad = { scene: unknown; gen: number | undefined };
 
   let loaded = false;
   let started = false;
   let destroyed = false;
+  // Set once the library has written its own initial scene. Until then a load
+  // is held rather than applied: the library resolves the app's `initialData`
+  // promise in a microtask that follows `start()`, and its init write would
+  // replace whatever we put on the canvas first — leaving an empty board that
+  // `onChange` then posts back to the parent as a save.
+  let canApply = false;
   let lastScene: string | null = null;
   // A load that arrives before `start()` is held rather than dropped. The
   // parent may post its scene as soon as the frame loads rather than waiting
@@ -292,6 +317,10 @@ export const createEmbedBridge = ({
     if (files.length) {
       api.addFiles(files);
     }
+    // The scene the parent sent is the floor. Without this the entry the
+    // library committed for its own (empty) init scene stays below ours, and
+    // one undo empties the board — which `onChange` would then save back.
+    api.history.clear();
     // Remember the loaded scene in the same form a save would take so the
     // onChange Excalidraw fires for this very update is not echoed back.
     lastScene = serializeAsJSON(
@@ -301,6 +330,18 @@ export const createEmbedBridge = ({
       "local",
     );
     loaded = true;
+  };
+
+  const applyPendingLoad = () => {
+    if (destroyed) {
+      return;
+    }
+    canApply = true;
+    if (pendingLoad) {
+      const load = pendingLoad;
+      pendingLoad = null;
+      applyLoad(load);
+    }
   };
 
   const handleMessage = (event: MessageEvent) => {
@@ -326,17 +367,19 @@ export const createEmbedBridge = ({
       return;
     }
 
-    if (
-      event.data?.type !== EMBED_MESSAGE_TYPES.LOAD ||
-      typeof event.data.scene !== "string"
-    ) {
+    if (event.data?.type !== EMBED_MESSAGE_TYPES.LOAD) {
       return;
     }
+    // Anything typed as a load is a load attempt. A missing or non-string
+    // `scene` fails in `parseEmbeddedScene` and is reported like any other
+    // unusable payload, rather than being dropped where neither side sees it.
     const load: PendingLoad = {
       scene: event.data.scene,
       gen: typeof event.data.gen === "number" ? event.data.gen : undefined,
     };
-    if (!started) {
+    if (!canApply) {
+      // one slot: if the parent answers `ready` before we are able to apply,
+      // its newer scene supersedes whatever was held
       pendingLoad = load;
       return;
     }
@@ -351,12 +394,10 @@ export const createEmbedBridge = ({
         return;
       }
       started = true;
-      if (pendingLoad) {
-        const load = pendingLoad;
-        pendingLoad = null;
-        applyLoad(load);
-      }
       post({ type: EMBED_MESSAGE_TYPES.READY });
+      // A macrotask lands strictly after the library's init write, which is
+      // synchronous once it stops awaiting the app's `initialData`.
+      window.setTimeout(applyPendingLoad, 0);
     },
     onChange: (elements, appState, files) => {
       if (!loaded) {

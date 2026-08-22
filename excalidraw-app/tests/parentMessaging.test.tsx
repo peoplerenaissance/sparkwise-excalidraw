@@ -1,6 +1,8 @@
 import { vi } from "vitest";
 import { render, waitFor } from "../../packages/excalidraw/tests/test-utils";
 import { API } from "../../packages/excalidraw/tests/helpers/api";
+import { Keyboard } from "../../packages/excalidraw/tests/helpers/ui";
+import { KEYS } from "../../packages/excalidraw/keys";
 import { restore } from "../../packages/excalidraw/data/restore";
 import { getDefaultAppState } from "../../packages/excalidraw/appState";
 import type { AppState } from "../../packages/excalidraw/types";
@@ -207,7 +209,7 @@ describe("parent origin allowlist", () => {
 describe("embed bridge", () => {
   type FakeAPI = Pick<
     ExcalidrawImperativeAPI,
-    "updateScene" | "addFiles" | "setToast" | "getAppState"
+    "updateScene" | "addFiles" | "setToast" | "getAppState" | "history"
   >;
 
   const liveAppState = () =>
@@ -234,6 +236,7 @@ describe("embed bridge", () => {
       addFiles: vi.fn(),
       setToast: vi.fn(),
       getAppState: vi.fn(liveAppState),
+      history: { clear: vi.fn() },
     };
     const parent = { postMessage: vi.fn() };
     // the bridge only accepts messages whose sender is its parent window
@@ -245,6 +248,9 @@ describe("embed bridge", () => {
     });
     if (start) {
       bridge.start();
+      // the bridge defers applying loads to a macrotask, so that the library's
+      // own init write cannot land on top of the parent's scene
+      vi.advanceTimersByTime(0);
     }
     return { api, parent, bridge };
   };
@@ -478,6 +484,28 @@ describe("embed bridge", () => {
     bridge.destroy();
   });
 
+  it.each([
+    ["a non-string scene", { scene: null }],
+    ["a scene the parent forgot to stringify", { scene: { elements: [] } }],
+    ["no scene at all", {}],
+  ])("reports %s instead of dropping it silently", (_label, payload) => {
+    const { api, parent, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      gen: 5,
+      ...payload,
+    });
+    const errors = parent.postMessage.mock.calls.filter(
+      ([msg]) => msg.type === EMBED_MESSAGE_TYPES.ERROR,
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0][0].gen).toBe(5);
+    expect(api.setToast).toHaveBeenCalledTimes(1);
+    expect(api.updateScene).not.toHaveBeenCalled();
+    expect(bridge.isLoaded()).toBe(false);
+    bridge.destroy();
+  });
+
   it("a failed load leaves a pending save armed so pre-load edits are not lost", () => {
     const { parent, bridge } = setup();
     dispatchMessage(PARENT_ORIGIN, {
@@ -630,6 +658,8 @@ describe("embed bridge", () => {
     expect(api.updateScene).not.toHaveBeenCalled();
 
     bridge.start();
+    expect(api.updateScene).not.toHaveBeenCalled(); // deferred past library init
+    vi.advanceTimersByTime(0);
     expect(api.updateScene).toHaveBeenCalledTimes(1);
     expect(
       api.updateScene.mock.calls[0][0].elements.map(
@@ -648,6 +678,7 @@ describe("embed bridge", () => {
     const { api, parent, bridge } = setup();
     bridge.start();
     bridge.start();
+    vi.advanceTimersByTime(0);
     expect(
       parent.postMessage.mock.calls.filter(
         ([msg]) => msg.type === EMBED_MESSAGE_TYPES.READY,
@@ -786,6 +817,78 @@ describe("ExcalidrawApp embedded mode", () => {
     expect(
       JSON.parse(localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS)!),
     ).toEqual([expect.objectContaining({ id: "LOCAL" })]);
+  });
+
+  it("a load applied before the library finished init survives it", async () => {
+    // the bridge registers its listener at construction, so a parent that
+    // posts on the frame's load event lands here — before the library has
+    // resolved initialData and written its own (empty) scene
+    const parent = { postMessage: vi.fn() };
+    setParentWindow(parent as unknown as Window);
+    setParentOriginParam(PARENT_ORIGIN);
+
+    const realAdd = window.addEventListener.bind(window);
+    const addSpy = vi
+      .spyOn(window, "addEventListener")
+      .mockImplementation((type: any, listener: any, opts?: any) => {
+        realAdd(type, listener, opts);
+        if (type === "message") {
+          // deliver the parent's scene the instant the bridge is listening
+          dispatchMessage(PARENT_ORIGIN, {
+            type: EMBED_MESSAGE_TYPES.LOAD,
+            scene: sceneDoc({ files: {} }),
+            gen: 1,
+          });
+        }
+      });
+
+    await render(<ExcalidrawApp />);
+    addSpy.mockRestore();
+
+    await waitFor(() => {
+      expect(parent.postMessage).toHaveBeenCalledWith(
+        { type: EMBED_MESSAGE_TYPES.READY },
+        PARENT_ORIGIN,
+      );
+    });
+    expect(h.elements.map((el) => el.id)).toEqual(["A", "B"]);
+    // and the empty init scene must never be posted back as a save
+    expect(
+      parent.postMessage.mock.calls.filter(
+        ([m]) => m.type === EMBED_MESSAGE_TYPES.SAVE,
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("undo immediately after a load cannot empty the board", async () => {
+    const parent = { postMessage: vi.fn() };
+    setParentWindow(parent as unknown as Window);
+    setParentOriginParam(PARENT_ORIGIN);
+
+    await render(<ExcalidrawApp />);
+    await waitFor(() => {
+      expect(parent.postMessage).toHaveBeenCalledWith(
+        { type: EMBED_MESSAGE_TYPES.READY },
+        PARENT_ORIGIN,
+      );
+    });
+
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: sceneDoc({ files: {} }),
+      gen: 1,
+    });
+    await waitFor(() => {
+      expect(h.elements.map((el) => el.id)).toEqual(["A", "B"]);
+    });
+
+    // the loaded scene is the floor: there is nothing before it to undo to
+    Keyboard.withModifierKeys({ ctrl: true }, () => {
+      Keyboard.keyPress(KEYS.Z);
+    });
+    expect(h.elements.filter((el) => !el.isDeleted).map((el) => el.id)).toEqual(
+      ["A", "B"],
+    );
   });
 
   it("not embedded: restores localStorage and posts nothing", async () => {
