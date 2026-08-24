@@ -15,6 +15,10 @@ import {
   FileId,
 } from "../../packages/excalidraw/element/types";
 import { decompressData } from "../../packages/excalidraw/data/encode";
+import {
+  getAllowedParentOrigins,
+  isAllowedParentOrigin,
+} from "../embed/parentMessaging";
 import Portal from "../collab/Portal";
 import * as Sentry from "@sentry/browser";
 
@@ -33,11 +37,6 @@ export class TokenService {
   private tokenPromise: Promise<string> | null = null;
   private eventHandlerRegistered = false;
   private pendingRequests = new Map();
-  private allowedOrigins = (
-    import.meta.env.VITE_APP_TOKEN_SERVICE_ALLOWED_ORIGINS || ""
-  )
-    .split(",")
-    .map((origin: string) => origin.trim());
 
   async getToken(): Promise<string> {
     if (this.cachedToken) {
@@ -71,12 +70,11 @@ export class TokenService {
   }
 
   private handleMessage = (event: MessageEvent) => {
-    if (!this.allowedOrigins.includes(event.origin)) {
+    if (!isAllowedParentOrigin(event.origin)) {
       console.warn(
         "[draw][token-service] Rejected message from untrusted origin:",
         event.origin,
-        this.allowedOrigins,
-        import.meta.env.VITE_APP_TOKEN_SERVICE_ALLOWED_ORIGINS,
+        getAllowedParentOrigins(),
       );
       return;
     }
