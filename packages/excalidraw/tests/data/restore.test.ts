@@ -19,6 +19,10 @@ describe("restoreElements", () => {
 
   beforeEach(() => {
     mockSizeHelper.mockReset();
+    // vitest >= 3 `mockReset` restores the original implementation (older
+    // versions reset to `() => undefined`). Default to "not invisibly small"
+    // so elements created without points/dimensions aren't filtered out.
+    mockSizeHelper.mockImplementation(() => false);
   });
 
   afterAll(() => {

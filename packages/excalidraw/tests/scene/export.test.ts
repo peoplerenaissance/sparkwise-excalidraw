@@ -65,7 +65,7 @@ describe("exportToSvg", () => {
     );
 
     expect(svgElement.getAttribute("filter")).toMatchInlineSnapshot(
-      '"_themeFilter_1883f3"',
+      `"_themeFilter_587bd1"`,
     );
   });
 
