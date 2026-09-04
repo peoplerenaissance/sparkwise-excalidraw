@@ -38,7 +38,7 @@ describe("event callbacks", () => {
       // files
       {},
     );
-    expect(onChange.mock.lastCall[1].viewBackgroundColor).not.toBe(
+    expect(onChange.mock.lastCall?.[1].viewBackgroundColor).not.toBe(
       origBackgroundColor,
     );
   });
