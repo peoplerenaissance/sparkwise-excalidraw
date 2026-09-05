@@ -8,6 +8,24 @@ import { register } from "./register";
 const shouldLock = (elements: readonly ExcalidrawElement[]) =>
   elements.every((el) => !el.locked);
 
+/**
+ * A lock placed by an embedding parent's AI agent is stamped
+ * `customData.lockedBy`, and the parent's guard treats a lock without that
+ * stamp as a person's. A person unlocking an element takes ownership of it:
+ * drop the stamp so a later re-lock reads as theirs. Only that key, only on
+ * the locked -> unlocked transition; other customData is left alone.
+ */
+const unlock = (element: ExcalidrawElement) => {
+  if (!element.customData || !("lockedBy" in element.customData)) {
+    return newElementWith(element, { locked: false });
+  }
+  const { lockedBy, ...customData } = element.customData;
+  return newElementWith(element, {
+    locked: false,
+    customData: Object.keys(customData).length ? customData : undefined,
+  });
+};
+
 export const actionToggleElementLock = register({
   name: "toggleElementLock",
   trackEvent: { category: "element" },
@@ -36,7 +54,9 @@ export const actionToggleElementLock = register({
           return element;
         }
 
-        return newElementWith(element, { locked: nextLockState });
+        return nextLockState
+          ? newElementWith(element, { locked: true })
+          : unlock(element);
       }),
       appState: {
         ...appState,
@@ -87,10 +107,7 @@ export const actionUnlockAllElements = register({
 
     return {
       elements: elements.map((element) => {
-        if (element.locked) {
-          return newElementWith(element, { locked: false });
-        }
-        return element;
+        return element.locked ? unlock(element) : element;
       }),
       appState: {
         ...appState,
