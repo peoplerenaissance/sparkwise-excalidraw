@@ -545,12 +545,16 @@ const LayerUI = ({
           >
             {renderWelcomeScreen && <tunnels.WelcomeScreenCenterTunnel.Out />}
             {renderFixedSideContainer()}
-            <Footer
-              appState={appState}
-              actionManager={actionManager}
-              showExitZenModeBtn={showExitZenModeBtn}
-              renderWelcomeScreen={renderWelcomeScreen}
-            />
+            {/* chromeless: no zoom/undo islands either, so a capture of the
+                frame is a capture of the scene */}
+            {UIOptions.mode !== "none" && (
+              <Footer
+                appState={appState}
+                actionManager={actionManager}
+                showExitZenModeBtn={showExitZenModeBtn}
+                renderWelcomeScreen={renderWelcomeScreen}
+              />
+            )}
             {appState.showStats && (
               <Stats
                 appState={appState}
