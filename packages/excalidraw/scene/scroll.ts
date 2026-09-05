@@ -66,13 +66,14 @@ export const calculateScrollCenter = (
   elements: readonly ExcalidrawElement[],
   appState: AppState,
   mode: string = "full",
-): { scrollX: number; scrollY: number } => {
+): { scrollX: number; scrollY: number; zoom: Zoom } => {
   elements = getVisibleElements(elements);
 
   if (!elements.length) {
     return {
       scrollX: 0,
       scrollY: 0,
+      zoom: appState.zoom,
     };
   }
   const [x1, y1, x2, y2] = getCommonBounds(elements);

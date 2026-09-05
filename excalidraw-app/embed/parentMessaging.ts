@@ -1,13 +1,20 @@
 import { serializeAsJSON } from "../../packages/excalidraw/data/json";
 import { restore } from "../../packages/excalidraw/data/restore";
 import type { ImportedDataState } from "../../packages/excalidraw/data/types";
+import { getVisibleElements } from "../../packages/excalidraw/element";
+import { getNormalizedZoom } from "../../packages/excalidraw/scene";
+import { calculateScrollCenter } from "../../packages/excalidraw/scene/scroll";
 import type { ExcalidrawElement } from "../../packages/excalidraw/element/types";
 import type {
   AppState,
   BinaryFiles,
   ExcalidrawImperativeAPI,
 } from "../../packages/excalidraw/types";
-import { debounce } from "../../packages/excalidraw/utils";
+import {
+  debounce,
+  getUiMode,
+  getViewportFromSearchParams,
+} from "../../packages/excalidraw/utils";
 
 /**
  * postMessage protocol between this app (running in an iframe) and the
@@ -219,6 +226,11 @@ export const createEmbedBridge = ({
   type PendingLoad = { scene: unknown; gen: number | undefined };
 
   let loaded = false;
+  // Set once a load has fitted the camera to its scene. Only the first scene
+  // shown gets fitted: a later load (a template reset, say) must not yank the
+  // author's camera mid-session. An empty or unmeasured first load does not
+  // count, since no camera was shown for it.
+  let fitted = false;
   let started = false;
   let destroyed = false;
   // Set once the library has written its own initial scene. Until then a load
@@ -265,6 +277,47 @@ export const createEmbedBridge = ({
     debounceMs,
   );
 
+  /**
+   * Camera for the first scene shown, or nothing. A scene document carries no
+   * camera, so without this the first load shows the origin at 100% — in a
+   * small capture frame, a clipped screenshot. The same fit as the reset-zoom
+   * button and the library's own init so the two views agree. A `?viewport=`
+   * home view is an explicit camera and wins over the fit.
+   */
+  const firstLoadFit = (
+    elements: readonly ExcalidrawElement[],
+    live: AppState,
+  ): Partial<Pick<AppState, "scrollX" | "scrollY" | "zoom">> => {
+    if (
+      fitted ||
+      // a blank board shows no camera worth keeping; the content load that
+      // follows is still the first scene shown
+      !getVisibleElements(elements).length ||
+      getViewportFromSearchParams() ||
+      // an unlaid-out frame (hidden, 0x0) has nothing to fit to; fitting
+      // would pin the board at minimum zoom in a corner for the session
+      !(live.width > 0 && live.height > 0)
+    ) {
+      return {};
+    }
+    const fit = calculateScrollCenter(
+      elements,
+      { ...live, zoom: { value: getNormalizedZoom(1) } },
+      getUiMode(),
+    );
+    // A scene with a non-finite coordinate would poison the camera with NaN
+    // (blank board, no recovery); leave that element culled instead.
+    if (
+      !Number.isFinite(fit.scrollX) ||
+      !Number.isFinite(fit.scrollY) ||
+      !Number.isFinite(fit.zoom.value)
+    ) {
+      return {};
+    }
+    fitted = true;
+    return fit;
+  };
+
   const applyLoad = ({ scene, gen: nextGen }: PendingLoad) => {
     const live = api.getAppState();
 
@@ -278,8 +331,15 @@ export const createEmbedBridge = ({
       // is absent from the parent's document; with no local state to fall back
       // on, `restore` fills defaults and the load would reset the camera,
       // re-enable frame rendering, and force the light theme.
+      //
+      // Re-measure text: scenes reach us from an AI agent and hand-editing,
+      // whose text elements carry guessed width/height. The renderer paints
+      // text clipped to the stored box and the first-load fit frames the
+      // stored box, so a guessed width both truncates the line and leaves it
+      // outside the fitted viewport.
       restored = restore(parseEmbeddedScene(scene), live, null, {
         repairBindings: true,
+        refreshDimensions: true,
       });
     } catch (error: any) {
       const message = error?.message || "invalid scene";
@@ -307,7 +367,11 @@ export const createEmbedBridge = ({
     // `restoreAppState` special-cases zoom and falls back to the default
     // rather than to the local state, so carry the live value across by hand.
     // A scene document can never supply one: zoom is not an exported key.
-    const nextAppState = { ...restored.appState, zoom: live.zoom };
+    const nextAppState = {
+      ...restored.appState,
+      zoom: live.zoom,
+      ...firstLoadFit(restored.elements, live),
+    };
     api.updateScene({
       elements: restored.elements,
       appState: nextAppState,

@@ -8,6 +8,7 @@ import { getDefaultAppState } from "../../packages/excalidraw/appState";
 import type { AppState } from "../../packages/excalidraw/types";
 import type { ExcalidrawImperativeAPI } from "../../packages/excalidraw/types";
 import type { BinaryFileData } from "../../packages/excalidraw/types";
+import type { ExcalidrawElement } from "../../packages/excalidraw/element/types";
 import {
   createEmbedBridge,
   EMBED_MESSAGE_TYPES,
@@ -21,6 +22,8 @@ import {
 import { STORAGE_KEYS } from "../app_constants";
 import ExcalidrawApp from "../App";
 import { LocalData } from "../data/LocalData";
+import * as utils from "../../packages/excalidraw/utils";
+import { calculateScrollCenter } from "../../packages/excalidraw/scene/scroll";
 
 const { h } = window;
 
@@ -115,6 +118,11 @@ const dispatchMessage = (
   window.dispatchEvent(event);
 };
 
+const savesPosted = (parent: { postMessage: ReturnType<typeof vi.fn> }) =>
+  parent.postMessage.mock.calls.filter(
+    ([msg]) => msg.type === EMBED_MESSAGE_TYPES.SAVE,
+  );
+
 beforeEach(() => {
   vi.stubEnv("VITE_APP_TOKEN_SERVICE_ALLOWED_ORIGINS", PARENT_ORIGIN);
   setSearch("/");
@@ -207,10 +215,12 @@ describe("parent origin allowlist", () => {
 });
 
 describe("embed bridge", () => {
+  // the bridge's whole surface on the imperative API; the fake is checked
+  // against it, so a missing or misspelled method fails at compile time
   type FakeAPI = Pick<
     ExcalidrawImperativeAPI,
-    "updateScene" | "addFiles" | "setToast" | "getAppState" | "history"
-  >;
+    "updateScene" | "addFiles" | "setToast" | "getAppState"
+  > & { history: Pick<ExcalidrawImperativeAPI["history"], "clear"> };
 
   const liveAppState = () =>
     ({
@@ -220,6 +230,11 @@ describe("embed bridge", () => {
       scrollX: -1200,
       scrollY: -800,
       zoom: { value: 2 as AppState["zoom"]["value"] },
+      // a laid-out frame, so a fit has a viewport to fit to
+      width: 800,
+      height: 600,
+      offsetLeft: 0,
+      offsetTop: 0,
       theme: "dark",
       frameRendering: {
         enabled: false,
@@ -242,7 +257,7 @@ describe("embed bridge", () => {
     // the bridge only accepts messages whose sender is its parent window
     setParentWindow(parent as unknown as Window);
     const bridge = createEmbedBridge({
-      api: api as unknown as FakeAPI as ExcalidrawImperativeAPI,
+      api: api as FakeAPI as ExcalidrawImperativeAPI,
       parentOrigin: PARENT_ORIGIN,
       parentWindow: parent as unknown as Window,
     });
@@ -265,11 +280,6 @@ describe("embed bridge", () => {
     bridge.onChange(elements, getDefaultAppState() as AppState, {});
     return elements;
   };
-
-  const savesPosted = (parent: { postMessage: ReturnType<typeof vi.fn> }) =>
-    parent.postMessage.mock.calls.filter(
-      ([msg]) => msg.type === EMBED_MESSAGE_TYPES.SAVE,
-    );
 
   it("posts ready exactly once to the parent origin on start", () => {
     const { parent, bridge } = setup();
@@ -558,7 +568,18 @@ describe("embed bridge", () => {
     bridge.destroy();
   });
 
-  it("a load preserves camera, theme and frame rendering the scene cannot carry", () => {
+  /** The camera the reset-zoom button lands on for these elements. */
+  const fitFor = (
+    elements: readonly ExcalidrawElement[],
+    live = liveAppState(),
+  ) =>
+    calculateScrollCenter(
+      elements,
+      { ...live, zoom: { value: 1 as AppState["zoom"]["value"] } },
+      utils.getUiMode(),
+    );
+
+  it("a load preserves theme and frame rendering the scene cannot carry", () => {
     // only gridSize and viewBackgroundColor survive an export round-trip, so
     // everything else must fall back to the live state rather than to defaults
     const { api, bridge } = setup();
@@ -567,9 +588,6 @@ describe("embed bridge", () => {
       scene: sceneDoc(),
     });
     const { appState } = api.updateScene.mock.calls[0][0];
-    expect(appState.scrollX).toBe(-1200);
-    expect(appState.scrollY).toBe(-800);
-    expect(appState.zoom.value).toBe(2);
     expect(appState.theme).toBe("dark");
     expect(appState.frameRendering).toEqual({
       enabled: false,
@@ -579,6 +597,139 @@ describe("embed bridge", () => {
     });
     // ...while what the scene does carry still wins
     expect(appState.viewBackgroundColor).toBe("#ffffff");
+    bridge.destroy();
+  });
+
+  it("the first load fits the camera exactly as reset-zoom would; a later load keeps the live camera", () => {
+    // a scene document carries no camera; without a fit the first load shows
+    // the origin at 100%, which in a small capture frame clips the board
+    const { api, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: sceneDoc(),
+    });
+    const first = api.updateScene.mock.calls[0][0];
+    const fit = fitFor(first.elements);
+    expect(fit.zoom.value).toBeLessThanOrEqual(1);
+    expect(first.appState).toEqual(expect.objectContaining(fit));
+    expect(first.appState.scrollX).not.toBe(-1200);
+    // e.g. a template reset re-posting the scene mid-session: the author's
+    // camera (the live state) is carried across untouched
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: JSON.stringify([
+        API.createElement({ type: "rectangle", id: "Q", x: 5000, y: 5000 }),
+      ]),
+    });
+    const second = api.updateScene.mock.calls[1][0].appState;
+    expect([second.scrollX, second.scrollY, second.zoom.value]).toEqual([
+      -1200, -800, 2,
+    ]);
+    bridge.destroy();
+  });
+
+  it("re-measures text on load so guessed dimensions neither clip nor mis-fit", () => {
+    // scenes authored as JSON (an AI agent, hand edits) carry guessed text
+    // width/height; the renderer clips to the stored box and the fit frames it
+    vi.spyOn(
+      window.CanvasRenderingContext2D.prototype,
+      "measureText",
+    ).mockReturnValue({ width: 1234 } as TextMetrics);
+    const { api, bridge } = setup();
+    const guessed = API.createElement({
+      type: "text",
+      id: "T",
+      text: "a line far wider than its stored box",
+      fontSize: 20,
+      width: 10,
+      height: 10,
+    });
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: JSON.stringify([guessed]),
+    });
+    const { elements, appState } = api.updateScene.mock.calls[0][0];
+    const [loaded] = elements;
+    // measured, not the stored guess (getTextWidth scales the raw metric)
+    expect(loaded.width).toBeGreaterThan(1000);
+    expect(loaded.height).toBe(20 * guessed.lineHeight);
+    // ...and the fit frames the measured box
+    expect(appState).toEqual(expect.objectContaining(fitFor([loaded])));
+    bridge.destroy();
+  });
+
+  it("an empty first load does not fit, and the content load that follows still does", () => {
+    const { api, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: "",
+    });
+    expect(bridge.isLoaded()).toBe(true);
+    const blank = api.updateScene.mock.calls[0][0].appState;
+    expect([blank.scrollX, blank.scrollY, blank.zoom.value]).toEqual([
+      -1200, -800, 2,
+    ]);
+    // no camera was shown for the blank board, so this is the first scene
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: sceneDoc(),
+    });
+    const { elements, appState } = api.updateScene.mock.calls[1][0];
+    expect(appState).toEqual(expect.objectContaining(fitFor(elements)));
+    bridge.destroy();
+  });
+
+  it("a ?viewport= home view wins over the first-load fit", () => {
+    vi.spyOn(utils, "getViewportFromSearchParams").mockReturnValue({
+      x: 0,
+      y: 0,
+      w: 100,
+      h: 100,
+    });
+    const { api, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: sceneDoc(),
+    });
+    const { appState } = api.updateScene.mock.calls[0][0];
+    expect([appState.scrollX, appState.scrollY, appState.zoom.value]).toEqual([
+      -1200, -800, 2,
+    ]);
+    bridge.destroy();
+  });
+
+  it("does not fit a frame that has no layout yet (0x0), so a hidden mount is not pinned at minimum zoom", () => {
+    const { api, bridge } = setup();
+    api.getAppState.mockImplementation(() => ({
+      ...liveAppState(),
+      width: 0,
+      height: 0,
+    }));
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      scene: sceneDoc(),
+    });
+    const { appState } = api.updateScene.mock.calls[0][0];
+    expect([appState.scrollX, appState.scrollY, appState.zoom.value]).toEqual([
+      -1200, -800, 2,
+    ]);
+    bridge.destroy();
+  });
+
+  it("a scene with a non-finite coordinate loads with the live camera rather than a NaN one", () => {
+    const { api, bridge } = setup();
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.LOAD,
+      // 1e999 parses to Infinity
+      scene: `[${JSON.stringify(
+        API.createElement({ type: "rectangle", id: "INF" }),
+      ).replace('"x":0', '"x":1e999')}]`,
+    });
+    expect(api.setToast).not.toHaveBeenCalled();
+    const { appState } = api.updateScene.mock.calls[0][0];
+    expect([appState.scrollX, appState.scrollY, appState.zoom.value]).toEqual([
+      -1200, -800, 2,
+    ]);
     bridge.destroy();
   });
 
@@ -805,6 +956,9 @@ describe("ExcalidrawApp embedded mode", () => {
     ).toHaveLength(1);
     expect(h.elements).toEqual([]);
 
+    // jsdom lays the frame out at 0x0; give it a viewport so the fit is a
+    // real one, and pin the camera the fit must move away from
+    h.setState({ width: 800, height: 600, scrollX: 0, scrollY: 0 });
     dispatchMessage(PARENT_ORIGIN, {
       type: EMBED_MESSAGE_TYPES.LOAD,
       scene: sceneDoc({ files: {} }),
@@ -812,6 +966,34 @@ describe("ExcalidrawApp embedded mode", () => {
     await waitFor(() => {
       expect(h.elements.map((el) => el.id)).toEqual(["A", "B"]);
     });
+    // the first load lands on exactly the camera reset-zoom would choose...
+    const fit = calculateScrollCenter(
+      h.elements,
+      { ...h.state, zoom: { value: 1 as AppState["zoom"]["value"] } },
+      utils.getUiMode(),
+    );
+    await waitFor(() => {
+      expect([h.state.scrollX, h.state.scrollY, h.state.zoom.value]).toEqual([
+        fit.scrollX,
+        fit.scrollY,
+        fit.zoom.value,
+      ]);
+    });
+    expect(fit).not.toEqual(
+      expect.objectContaining({ scrollX: 0, scrollY: 0 }),
+    );
+    // ...and the camera write is not echoed back as a save (scroll/zoom are
+    // not exported keys, so the serialized scene is unchanged): a FLUSH posts
+    // anything pending synchronously, then acks
+    dispatchMessage(PARENT_ORIGIN, {
+      type: EMBED_MESSAGE_TYPES.FLUSH,
+      requestId: "after-fit",
+    });
+    expect(parent.postMessage).toHaveBeenCalledWith(
+      { type: EMBED_MESSAGE_TYPES.FLUSHED, requestId: "after-fit" },
+      PARENT_ORIGIN,
+    );
+    expect(savesPosted(parent)).toHaveLength(0);
     // embedded sessions must not write the browser-local scene
     expect(localSave).not.toHaveBeenCalled();
     expect(
