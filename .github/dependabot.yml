@@ -1,0 +1,43 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    labels:
+      - "dependencies"
+    groups:
+      # Build/test tooling: never ships to the browser. One PR a week, all of it.
+      dev-tooling:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      # Anything that reaches a user's browser gets its own PR so it is reviewed
+      # on its own merits rather than buried in tooling churn.
+      production-patch:
+        dependency-type: "production"
+        update-types:
+          - "patch"
+    ignore:
+      # Pinned deliberately in the root "resolutions" block; see that block for why.
+      # Bumping these needs a coordinated change, not a drive-by PR.
+      - dependency-name: "@types/react"
+      - dependency-name: "@types/react-dom"
+      - dependency-name: "@types/node"
+      - dependency-name: "cssstyle"
+      - dependency-name: "@babel/plugin-transform-regenerator"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+    groups:
+      actions:
+        patterns:
+          - "*"
