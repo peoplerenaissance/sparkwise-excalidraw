@@ -298,7 +298,12 @@ export const loadFromHttpStorage = async (
     httpStorageSceneVersionCache.set(socket!, getSceneVersion(elements));
   }
 
-  return restoreElements(elements, null);
+  // Re-measure text, as the embed bridge does: scenes authored as JSON carry
+  // guessed text boxes, and the renderer clips text to its stored box.
+  return restoreElements(elements, null, {
+    repairBindings: true,
+    refreshDimensions: true,
+  });
 };
 
 export const saveFilesToHttpStorage = async ({

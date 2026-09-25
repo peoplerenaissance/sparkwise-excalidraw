@@ -12,6 +12,7 @@ import {
   ExcalidrawFreeDrawElement,
   FontFamilyValues,
   ExcalidrawTextContainer,
+  ExcalidrawTextElementWithContainer,
   ExcalidrawFrameElement,
   ExcalidrawEmbeddableElement,
   ExcalidrawMagicFrameElement,
@@ -36,6 +37,7 @@ import {
   wrapText,
   getBoundTextMaxWidth,
   getDefaultLineHeight,
+  computeBoundTextPosition,
 } from "./textElement";
 import {
   DEFAULT_ELEMENT_PROPS,
@@ -335,7 +337,9 @@ const getAdjustedDimensions = (
 export const refreshTextDimensions = (
   textElement: ExcalidrawTextElement,
   container: ExcalidrawTextContainer | null,
-  text = textElement.text,
+  // bound text re-wraps from its source: `text` carries the breaks of an
+  // earlier wrap, which a wider line cannot undo
+  text = container ? textElement.originalText : textElement.text,
 ) => {
   if (textElement.isDeleted) {
     return;
@@ -348,6 +352,18 @@ export const refreshTextDimensions = (
     );
   }
   const dimensions = getAdjustedDimensions(textElement, text);
+  if (container) {
+    // bound text sits where its container's alignment puts it, not where its
+    // previous box happened to be
+    return {
+      text,
+      ...dimensions,
+      ...computeBoundTextPosition(container, {
+        ...textElement,
+        ...dimensions,
+      } as ExcalidrawTextElementWithContainer),
+    };
+  }
   return { text, ...dimensions };
 };
 
