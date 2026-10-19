@@ -27,8 +27,8 @@
     "@types/react": "18.0.15",
     "@types/react-dom": "18.0.6",
     "@vitejs/plugin-react": "3.1.0",
-    "@vitest/coverage-v8": "3.2.7",
-    "@vitest/ui": "3.2.7",
+    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/ui": "4.1.11",
     "chai": "4.3.6",
     "dotenv": "16.0.1",
     "eslint-config-prettier": "8.5.0",
@@ -46,11 +46,11 @@
     "vite-plugin-checker": "0.6.4",
     "vite-plugin-ejs": "1.7.0",
     "vite-plugin-svgr": "2.4.0",
-    "vitest": "3.2.7",
+    "vitest": "4.1.11",
     "vitest-canvas-mock": "0.3.2"
   },
   "engines": {
-    "node": "18.0.0 - 22.x.x"
+    "node": "^20.19.0 || ^22.0.0"
   },
   "homepage": ".",
   "prettier": "@excalidraw/prettier-config",
