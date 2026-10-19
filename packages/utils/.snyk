@@ -1,0 +1,19 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+# Snyk reads the policy next to each manifest; keep in step with ../../.snyk.
+version: v1.25.1
+ignore:
+  SNYK-JS-BRACES-19963945:
+    - '*':
+        reason: >-
+          No fixed version is available. Reached only through build and lint
+          tooling, on glob patterns written in this repository.
+        expires: 2027-01-16T00:00:00.000Z
+        created: 2026-10-18T00:00:00.000Z
+  SNYK-JS-URIJS-19963963:
+    - '*':
+        reason: >-
+          No fixed version is available. Reached only through ajv 6 in build
+          and lint tooling, on configuration written in this repository.
+        expires: 2027-01-16T00:00:00.000Z
+        created: 2026-10-18T00:00:00.000Z
+patch: {}
