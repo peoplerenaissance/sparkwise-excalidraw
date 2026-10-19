@@ -1,0 +1,28 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+# Snyk reads the policy next to each manifest: packages/excalidraw/.snyk and
+# packages/utils/.snyk repeat these entries for their workspaces.
+version: v1.25.1
+ignore:
+  SNYK-JS-ESBUILD-17750822:
+    - '*':
+        reason: >-
+          Not applicable. The affected code is in esbuild's Deno module, which
+          the npm package does not ship. The matching GitHub advisory
+          (GHSA-gv7w-rqvm-qjhr) has been withdrawn.
+        expires: 2027-01-16T00:00:00.000Z
+        created: 2026-10-18T00:00:00.000Z
+  SNYK-JS-BRACES-19963945:
+    - '*':
+        reason: >-
+          No fixed version is available. Reached only through build and lint
+          tooling, on glob patterns written in this repository.
+        expires: 2027-01-16T00:00:00.000Z
+        created: 2026-10-18T00:00:00.000Z
+  SNYK-JS-URIJS-19963963:
+    - '*':
+        reason: >-
+          No fixed version is available. Reached only through ajv 6 in build
+          and lint tooling, on configuration written in this repository.
+        expires: 2027-01-16T00:00:00.000Z
+        created: 2026-10-18T00:00:00.000Z
+patch: {}

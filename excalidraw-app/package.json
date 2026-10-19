@@ -23,7 +23,7 @@
     ]
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "^20.19.0 || ^22.0.0"
   },
   "dependencies": {},
   "prettier": "@excalidraw/prettier-config",
@@ -34,7 +34,7 @@
     "build:version": "node ../scripts/build-version.js",
     "build": "yarn build:app && yarn build:version",
     "start": "yarn && vite",
-    "start:production": "npm run build && npx http-server build -a localhost -p 5001 -o",
+    "start:production": "npm run build && vite preview --port 5001 --strictPort",
     "build:preview": "yarn build && vite preview --port 5000"
   }
 }
