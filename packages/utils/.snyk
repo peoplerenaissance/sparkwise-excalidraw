@@ -16,4 +16,11 @@ ignore:
           and lint tooling, on configuration written in this repository.
         expires: 2027-01-16T00:00:00.000Z
         created: 2026-10-18T00:00:00.000Z
+  SNYK-JS-PICOMATCH-21248802:
+    - '*':
+        reason: >-
+          No fixed version is available. Reached only through build, lint and
+          test tooling, on glob patterns written in this repository.
+        expires: 2027-01-16T00:00:00.000Z
+        created: 2026-10-23T00:00:00.000Z
 patch: {}
