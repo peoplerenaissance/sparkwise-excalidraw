@@ -20,7 +20,8 @@ ignore:
     - '*':
         reason: >-
           No fixed version is available. Reached only through build, lint and
-          test tooling, on glob patterns written in this repository.
+          test tooling, including the build-time SCSS compiler sass, on glob
+          patterns set by this repository or by those tools.
         expires: 2027-01-16T00:00:00.000Z
         created: 2026-10-23T00:00:00.000Z
 patch: {}
